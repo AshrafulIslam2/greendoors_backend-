@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 Int               @id @default(autoincrement())
+  name               String?
+  email              String            @unique
+  password           String
+  personalInfo       userPersonalInfo? @relation(fields: [userPersonalInfoId], references: [id])
+  userPersonalInfoId Int?              @unique
+  nominee            Nominee?          @relation(fields: [nomineeId], references: [id])
+  nomineeId          Int?              @unique
+  role               Role              @default(MEMBER)
+  member             memberInfo?       @relation(fields: [memberInfoId], references: [id])
+  memberInfoId       Int?              @unique
+  deposits           depositInfo[]     @relation("UserDeposits")
+  fines              fineInfo[]        @relation("UserFines")
+}
+
+model memberInfo {
+  id          Int       @id @default(autoincrement())
+  type        String // e.g., "founder", "general_member", etc.
+  memberId    String    @unique
+  joiningDate DateTime?
+  user        User?
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+}
+
+model userPersonalInfo {
+  id        Int       @id @default(autoincrement())
+  name      String
+  phone     String
+  email     String
+  dob       DateTime?
+  address   String?
+  nid       String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User?     @relation
+}
+
+model Nominee {
+  id        Int       @id @default(autoincrement())
+  name      String
+  phone     String
+  email     String?
+  dob       DateTime?
+  address   String?
+  nid       String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User?     @relation
+}
+
+model depositInfo {
+  id          Int      @id @default(autoincrement())
+  amount      String
+  depositDate DateTime
+  user        User     @relation("UserDeposits", fields: [userId], references: [id])
+  userId      Int
+  createdAt   DateTime @default(now())
+}
+
+model fineInfo {
+  id        Int      @id @default(autoincrement())
+  amount    String
+  createdAt DateTime @default(now())
+  user      User     @relation("UserFines", fields: [userId], references: [id])
+  userId    Int
+}
+
+enum Role {
+  SUPER_ADMIN
+  MEMBER
+  FOUNDER
+  CO_FOUNDER
+  EXECUTIVE_MEMBER
+}
