@@ -2,11 +2,25 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
-import { create } from 'domain';
+import axios from 'axios';
 
 @Injectable()
 export class UserService {
     constructor(private readonly prisma: PrismaService) { }
+    private async uploadToImgBB(file: Express.Multer.File): Promise<string> {
+        console.log("ash", file)
+        const base64 = file.buffer.toString('base64');
+
+        const formData = new URLSearchParams();
+        formData.append('image', base64);
+
+        const response = await axios.post(
+            'https://api.imgbb.com/1/upload?key=ec3e94443bef2d7363a15f86c0374146',
+            formData
+        );
+
+        return response.data.data.url;
+    }
 
     async createMember(memberId, dto: any) {
         const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -37,10 +51,49 @@ export class UserService {
             },
         });
     }
-    async addPersonalInfo(userId, dto: any) {
+    async addPersonalInfo(userId: number, dto: any, files) {
+        const existingInfo = await this.prisma.userPersonalInfo.findFirst({
+            where: {
+                user: { id: userId }, // Assumes userId is the foreign key in userPersonalInfo
+            },
+        });
+        console.log(existingInfo)
+        const fileMap = files.reduce((acc, file) => {
+            if (!acc[file.fieldname]) {
+                acc[file.fieldname] = [];
+            }
+            acc[file.fieldname].push(file);
+            return acc;
+        }, {} as Record<string, Express.Multer.File[]>);;
+        console.log("===========", fileMap)
+        const profileImageUrl = fileMap.ProfileImage
+            ? await this.uploadToImgBB(fileMap.ProfileImage[0])
+            : null;
+        const nidFrontUrl = fileMap.nidImageFrontPart
+            ? await this.uploadToImgBB(fileMap.nidImageFrontPart[0])
+            : null;
+        const nidBackUrl = fileMap.nidImageBackPart
+            ? await this.uploadToImgBB(fileMap.nidImageBackPart[0])
+            : null;
+
+        if (existingInfo) {
+            const updatedInfo = await this.prisma.userPersonalInfo.update({
+                where: { id: existingInfo.id },
+                data: {
+                    ...dto,
+                    ProfileImage: profileImageUrl,
+                    nidImageFrontPart: nidFrontUrl,
+                    nidImageBackPart: nidBackUrl,
+                },
+            });
+            return updatedInfo;
+        }
         const info = await this.prisma.userPersonalInfo.create({
             data: {
                 ...dto,
+                ProfileImage: profileImageUrl,
+                nidImageFrontPart: nidFrontUrl,
+                nidImageBackPart: nidBackUrl,
                 user: {
                     connect: {
                         id: userId

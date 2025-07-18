@@ -3,12 +3,14 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable prettier/prettier */
-import { Body, Controller, Get, Patch, Post, Req, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, Request, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'; // Import JwtAuthGuard
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { Role } from '@prisma/client';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { multerConfig } from 'src/common/multer.config';
 
 @Controller('user')
 export class UserController {
@@ -23,8 +25,15 @@ export class UserController {
     }
     @UseGuards(JwtAuthGuard)
     @Post('add-personal-info')
-    addPersonalInfo(@Request() req, @Body() dto: any) {
-        return this.userService.addPersonalInfo(req.user.id, dto);
+    @UseInterceptors(AnyFilesInterceptor(multerConfig))
+    addPersonalInfo(@Request() req, @Body() dto: any, @UploadedFiles()
+    files: {
+        ProfileImage?: Express.Multer.File[];
+        nidImageFrontPart?: Express.Multer.File[];
+        nidImageBackPart?: Express.Multer.File[];
+    },) {
+        console.log("===as", files)
+        return this.userService.addPersonalInfo(req.user.id, dto, files);
     }
     @UseGuards(JwtAuthGuard)
     @Patch('add-personal-info/update')
