@@ -1,32 +1,36 @@
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable prettier/prettier */
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
+import { create } from 'domain';
 
 @Injectable()
 export class UserService {
     constructor(private readonly prisma: PrismaService) { }
 
-    async createMember(dto: any) {
+    async createMember(memberId, dto: any) {
         const hashedPassword = await bcrypt.hash(dto.password, 10);
-
         return this.prisma.user.create({
             data: {
                 email: dto.email,
                 password: hashedPassword,
                 name: dto.name,
-                role: dto.role || Role.MEMBER,
+                role: Role.MEMBER,
                 member: {
                     create: {
                         memberId: dto.memberId,
                         joiningDate: dto.joiningDate,
                         type: dto.role || 'MEMBER',
+                        registrationFeeInfo: dto.registrationAmount ? {
+                            create: {
+                                amount: dto.registrationAmount,
+                                receivedAt: new Date(),
+                                receivedBy: memberId,
+                            }
+                        } : undefined
                     },
                 },
+
             },
             include: {
                 member: true,
@@ -83,6 +87,49 @@ export class UserService {
 
         return nominee;
     }
+
+    async updatePersonalInfo(userId: number, dto: any) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId }, select: {
+                userPersonalInfoId: true
+            }
+        });
+        if (!user?.userPersonalInfoId) {
+            throw new NotFoundException('User or personal info not found');
+        }
+        const data: any = {};
+        if (dto.name !== undefined) data.name = dto.name;
+        if (dto.phone !== undefined) data.phone = dto.phone;
+        if (dto.email !== undefined) data.email = dto.email;
+        if (dto.dob !== undefined) data.dob = new Date(dto.dob);
+        if (dto.address !== undefined) data.address = dto.address;
+        if (dto.nid !== undefined) data.nid = dto.nid;
+        return this.prisma.userPersonalInfo.update({
+            where: { id: user.userPersonalInfoId },
+            data,
+        });
+    }
+    async updateNomineeInfo(userId: number, dto: any) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId }, select: {
+                nominee: true
+            }
+        });
+        if (!user?.nominee) {
+            throw new NotFoundException('User or personal info not found');
+        }
+        const data: any = {};
+        if (dto.name !== undefined) data.name = dto.name;
+        if (dto.phone !== undefined) data.phone = dto.phone;
+        if (dto.email !== undefined) data.email = dto.email;
+        if (dto.dob !== undefined) data.dob = new Date(dto.dob);
+        if (dto.address !== undefined) data.address = dto.address;
+        if (dto.nid !== undefined) data.nid = dto.nid;
+        return this.prisma.nominee.update({
+            where: { id: user.nominee.id },
+            data,
+        });
+    }
     async getUserInfo(userId: number) {
         return this.prisma.user.findUnique({
             where: { id: userId },
@@ -94,8 +141,6 @@ export class UserService {
                 personalInfo: true,
                 nominee: true,
                 member: true,
-                deposits: true,
-                fines: true,
             },
         });
     }

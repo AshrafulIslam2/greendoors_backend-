@@ -25,7 +25,13 @@ async function main() {
                 create: {
                     memberId: '1901',
                     type: 'Founder',
-                    joiningDate: new Date('2019-10-01')
+                    joiningDate: new Date('2019-10-01'),
+                    registrationFeeInfo: {
+                        create: {
+                            amount: 500
+                        }
+                    }
+
                 }
             }
         },

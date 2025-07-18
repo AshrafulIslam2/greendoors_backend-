@@ -25,31 +25,42 @@ model User {
   role               Role              @default(MEMBER)
   member             memberInfo?       @relation(fields: [memberInfoId], references: [id])
   memberInfoId       Int?              @unique
-  deposits           depositInfo[]     @relation("UserDeposits")
-  fines              fineInfo[]        @relation("UserFines")
 }
 
-model memberInfo {
-  id          Int       @id @default(autoincrement())
-  type        String // e.g., "founder", "general_member", etc.
-  memberId    String    @unique
-  joiningDate DateTime?
-  user        User?
-  updatedAt   DateTime  @updatedAt
-  createdAt   DateTime  @default(now())
+enum Role {
+  SUPER_ADMIN
+  MEMBER
+  FOUNDER
+  CO_FOUNDER
+  EXECUTIVE_MEMBER
 }
 
 model userPersonalInfo {
   id        Int       @id @default(autoincrement())
-  name      String
-  phone     String
-  email     String
+  name      String?
+  phone     String?
+  email     String?
   dob       DateTime?
   address   String?
-  nid       String
+  nid       String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   user      User?     @relation
+}
+
+model memberInfo {
+  id                  Int                  @id @default(autoincrement())
+  type                String
+  memberId            String               @unique
+  joiningDate         DateTime?
+  user                User?
+  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime             @default(now())
+  PettyCashExpense    PettyCashExpense[]
+  deposits            depositInfo[]
+  lateFees            lateFee[]
+  registrationFeeInfo registrationFeeInfo?
+  Investment          Investment[]
 }
 
 model Nominee {
@@ -65,27 +76,81 @@ model Nominee {
   user      User?     @relation
 }
 
+model registrationFeeInfo {
+  id         Int        @id @default(autoincrement())
+  amount     Decimal    @db.Decimal(10, 2)
+  receivedBy String?
+  receivedAt DateTime   @default(now())
+  notes      String?
+  member     memberInfo @relation(fields: [memberId], references: [id])
+  memberId   Int        @unique
+}
+
 model depositInfo {
-  id          Int      @id @default(autoincrement())
-  amount      String
+  id          Int        @id @default(autoincrement())
+  amount      Decimal    @db.Decimal(10, 2)
   depositDate DateTime
-  user        User     @relation("UserDeposits", fields: [userId], references: [id])
-  userId      Int
-  createdAt   DateTime @default(now())
+  member      memberInfo @relation(fields: [memberId], references: [id])
+  memberId    Int
+  lateFee     lateFee?   @relation
 }
 
-model fineInfo {
-  id        Int      @id @default(autoincrement())
-  amount    String
-  createdAt DateTime @default(now())
-  user      User     @relation("UserFines", fields: [userId], references: [id])
-  userId    Int
+model lateFee {
+  id            Int         @id @default(autoincrement())
+  amount        Decimal     @default(100) @db.Decimal(10, 2)
+  feeDate       DateTime    @default(now())
+  description   String?
+  memberInfo    memberInfo  @relation(fields: [memberInfoId], references: [id])
+  memberInfoId  Int
+  depositInfo   depositInfo @relation(fields: [depositInfoId], references: [id])
+  depositInfoId Int         @unique // Enforces one-to-one with depositInfo
 }
 
-enum Role {
-  SUPER_ADMIN
-  MEMBER
-  FOUNDER
-  CO_FOUNDER
-  EXECUTIVE_MEMBER
+model CashBalance {
+  id              Int      @id @default(autoincrement())
+  totalDeposit    Decimal  @default(0) @db.Decimal(10, 2)
+  totalExpense    Decimal  @default(0) @db.Decimal(10, 2)
+  totalInvestment Decimal  @default(0) @db.Decimal(10, 2)
+  totalProfit     Decimal  @default(0) @db.Decimal(10, 2)
+  totalLoss       Decimal  @default(0) @db.Decimal(10, 2)
+  availableCash   Decimal  @default(0) @db.Decimal(10, 2)
+  updatedAt       DateTime @updatedAt
+}
+
+model PettyCashExpense {
+  id             Int        @id @default(autoincrement())
+  expenseType    String
+  amount         Decimal    @db.Decimal(10, 2)
+  paidTo         String?
+  paidAt         DateTime   @default(now())
+  description    String?
+  paidByMemberId Int // 🔗 FK to memberInfo.id
+  paidByMember   memberInfo @relation(fields: [paidByMemberId], references: [id])
+}
+
+model Investment {
+  id                           Int              @id @default(autoincrement())
+  InvestmentName               String
+  amountInvested               Decimal          @db.Decimal(10, 2)
+  InvestmentDescription        String?
+  InvestmentStartDate          DateTime
+  InvestmentEndDate            DateTime
+  InvestmentContactPersonName  String
+  InvestmentContactPersonPhone String
+  InvestmentContactPersonEmail String?
+  InvestmentContactPersonNID   String
+  InvestmentContactPersonImage String?
+  authorizedMember             memberInfo       @relation(fields: [authorizedMemberId], references: [id])
+  authorizedMemberId           Int
+  investedAt                   DateTime         @default(now())
+  status                       InvestmentStatus @default(PENDING)
+  profitLossAmount             Decimal?         @db.Decimal(10, 2) // positive = profit, negative = loss, null = not realized yet
+  updatedAt                    DateTime         @updatedAt
+}
+
+enum InvestmentStatus {
+  PENDING // investment is active, outcome not known yet
+  PROFIT // investment gained profit
+  LOSS // investment lost money
+  CLOSED // closed with no profit or loss
 }

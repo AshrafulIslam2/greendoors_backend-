@@ -3,7 +3,7 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable prettier/prettier */
-import { Body, Controller, Get, Post, Req, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, Request, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'; // Import JwtAuthGuard
 import { RolesGuard } from 'src/auth/roles.guard';
@@ -17,14 +17,27 @@ export class UserController {
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
     @Roles(Role.SUPER_ADMIN)
     @Post('create')
-    create(@Body() dto: any) {
-        return this.userService.createMember(dto);
+    create(@Request() req, @Body() dto: any) {
+        console.log(req.user)
+        return this.userService.createMember(req.user.memberId, dto);
     }
     @UseGuards(JwtAuthGuard)
     @Post('add-personal-info')
     addPersonalInfo(@Request() req, @Body() dto: any) {
         return this.userService.addPersonalInfo(req.user.id, dto);
     }
+    @UseGuards(JwtAuthGuard)
+    @Patch('add-personal-info/update')
+    updatePersonalInfo(@Request() req, @Body() dto: any) {
+        return this.userService.updatePersonalInfo(req.user.id, dto);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Patch('add-nominee-info/update')
+    updateNomineeInfo(@Request() req, @Body() dto: any) {
+        return this.userService.updateNomineeInfo(req.user.id, dto);
+    }
+
 
     @UseGuards(JwtAuthGuard)
     @Post('add-nominee-info')
