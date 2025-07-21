@@ -51,20 +51,20 @@ model userPersonalInfo {
   user              User?     @relation
 }
 
-model memberInfo {
-  id                  Int                  @id @default(autoincrement())
-  type                String
-  memberId            String               @unique
-  joiningDate         DateTime?
-  user                User?
-  updatedAt           DateTime             @updatedAt
-  createdAt           DateTime             @default(now())
-  PettyCashExpense    PettyCashExpense[]
-  deposits            depositInfo[]
-  lateFees            lateFee[]
-  registrationFeeInfo registrationFeeInfo?
-  Investment          Investment[]
-}
+// model memberInfo {
+//   id                  Int                  @id @default(autoincrement())
+//   type                String
+//   memberId            String               @unique
+//   joiningDate         DateTime?
+//   user                User?
+//   updatedAt           DateTime             @updatedAt
+//   createdAt           DateTime             @default(now())
+//   PettyCashExpense    PettyCashExpense[]
+//   lateFees            lateFee[]
+//   registrationFeeInfo registrationFeeInfo?
+//   Investment          Investment[]
+//   depositInfo         depositInfo[]
+// }
 
 model Nominee {
   id                Int       @id @default(autoincrement())
@@ -73,7 +73,7 @@ model Nominee {
   email             String?
   dob               DateTime?
   address           String?
-  nid               String
+  nid               String?
   nidImageFrontPart String?
   nidImageBackPart  String?
   createdAt         DateTime  @default(now())
@@ -91,12 +91,32 @@ model registrationFeeInfo {
   memberId   Int        @unique
 }
 
+model memberInfo {
+  id                  Int                  @id @default(autoincrement())
+  type                String
+  memberId            String               @unique
+  joiningDate         DateTime?
+  user                User?
+  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime             @default(now())
+  PettyCashExpense    PettyCashExpense[]
+  deposits            depositInfo[]        @relation("MemberDeposits")
+  lateFees            lateFee[]            @relation("MemberFines")
+  registrationFeeInfo registrationFeeInfo?
+  Investment          Investment[]
+}
+
 model depositInfo {
   id          Int        @id @default(autoincrement())
   amount      Decimal    @db.Decimal(10, 2)
   depositDate DateTime
-  member      memberInfo @relation(fields: [memberId], references: [id])
-  memberId    Int
+  notes       String?
+  depositSlip String?
+  year        Int
+  month       Int
+  day         Int
+  member      memberInfo @relation("MemberDeposits", fields: [memberId], references: [memberId])
+  memberId    String
   lateFee     lateFee?   @relation
 }
 
@@ -105,21 +125,23 @@ model lateFee {
   amount        Decimal     @default(100) @db.Decimal(10, 2)
   feeDate       DateTime    @default(now())
   description   String?
-  memberInfo    memberInfo  @relation(fields: [memberInfoId], references: [id])
-  memberInfoId  Int
+  member        memberInfo  @relation("MemberFines", fields: [memberId], references: [memberId])
+  memberId      String
   depositInfo   depositInfo @relation(fields: [depositInfoId], references: [id])
   depositInfoId Int         @unique // Enforces one-to-one with depositInfo
 }
 
 model CashBalance {
-  id              Int      @id @default(autoincrement())
-  totalDeposit    Decimal  @default(0) @db.Decimal(10, 2)
-  totalExpense    Decimal  @default(0) @db.Decimal(10, 2)
-  totalInvestment Decimal  @default(0) @db.Decimal(10, 2)
-  totalProfit     Decimal  @default(0) @db.Decimal(10, 2)
-  totalLoss       Decimal  @default(0) @db.Decimal(10, 2)
-  availableCash   Decimal  @default(0) @db.Decimal(10, 2)
-  updatedAt       DateTime @updatedAt
+  id                   Int      @id @default(autoincrement())
+  totalDeposit         Decimal  @default(0) @db.Decimal(10, 2)
+  totalExpense         Decimal  @default(0) @db.Decimal(10, 2)
+  totalInvestment      Decimal  @default(0) @db.Decimal(10, 2)
+  totalProfit          Decimal  @default(0) @db.Decimal(10, 2)
+  totalLateFee         Decimal  @default(0) @db.Decimal(10, 2)
+  totalRegistrationFee Decimal  @default(0) @db.Decimal(10, 2)
+  totalLoss            Decimal  @default(0) @db.Decimal(10, 2)
+  availableCash        Decimal  @default(0) @db.Decimal(10, 2)
+  updatedAt            DateTime @updatedAt
 }
 
 model PettyCashExpense {

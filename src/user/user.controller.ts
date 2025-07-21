@@ -1,8 +1,4 @@
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable prettier/prettier */
+
 import { Body, Controller, Get, Patch, Post, Req, Request, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'; // Import JwtAuthGuard
@@ -35,23 +31,42 @@ export class UserController {
         console.log("===as", files)
         return this.userService.addPersonalInfo(req.user.id, dto, files);
     }
+
     @UseGuards(JwtAuthGuard)
     @Patch('add-personal-info/update')
-    updatePersonalInfo(@Request() req, @Body() dto: any) {
-        return this.userService.updatePersonalInfo(req.user.id, dto);
+    @UseInterceptors(AnyFilesInterceptor(multerConfig))
+    updatePersonalInfo(@Request() req, @Body() dto: any, @UploadedFiles()
+    files: {
+        ProfileImage?: Express.Multer.File[];
+        nidImageFrontPart?: Express.Multer.File[];
+        nidImageBackPart?: Express.Multer.File[];
+    },) {
+        return this.userService.addPersonalInfo(req.user.id, dto, files);
     }
 
     @UseGuards(JwtAuthGuard)
     @Patch('add-nominee-info/update')
-    updateNomineeInfo(@Request() req, @Body() dto: any) {
-        return this.userService.updateNomineeInfo(req.user.id, dto);
+    @UseInterceptors(AnyFilesInterceptor(multerConfig))
+    updateNomineeInfo(@Request() req, @Body() dto: any, @UploadedFiles()
+    files: {
+        ProfileImage?: Express.Multer.File[];
+        nidImageFrontPart?: Express.Multer.File[];
+        nidImageBackPart?: Express.Multer.File[];
+    },) {
+        return this.userService.addNomineeInfo(req.user.id, dto, files);
     }
 
 
     @UseGuards(JwtAuthGuard)
     @Post('add-nominee-info')
-    addNomineeInfo(@Request() req, @Body() dto) {
-        return this.userService.addNomineeInfo(req.user.id, dto);
+    @UseInterceptors(AnyFilesInterceptor(multerConfig))
+    addNomineeInfo(@Request() req, @Body() dto: any, @UploadedFiles()
+    files: {
+        ProfileImage?: Express.Multer.File[];
+        nidImageFrontPart?: Express.Multer.File[];
+        nidImageBackPart?: Express.Multer.File[];
+    },) {
+        return this.userService.addNomineeInfo(req.user.id, dto, files);
     }
     @UseGuards(JwtAuthGuard)
     @Get('me')
