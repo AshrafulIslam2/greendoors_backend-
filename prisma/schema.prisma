@@ -45,26 +45,13 @@ model userPersonalInfo {
   ProfileImage      String?
   nidImageFrontPart String?
   nidImageBackPart  String?
+  bloodGroup        String?
+  gender            String?
   nid               String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   user              User?     @relation
 }
-
-// model memberInfo {
-//   id                  Int                  @id @default(autoincrement())
-//   type                String
-//   memberId            String               @unique
-//   joiningDate         DateTime?
-//   user                User?
-//   updatedAt           DateTime             @updatedAt
-//   createdAt           DateTime             @default(now())
-//   PettyCashExpense    PettyCashExpense[]
-//   lateFees            lateFee[]
-//   registrationFeeInfo registrationFeeInfo?
-//   Investment          Investment[]
-//   depositInfo         depositInfo[]
-// }
 
 model Nominee {
   id                Int       @id @default(autoincrement())
@@ -75,6 +62,8 @@ model Nominee {
   address           String?
   nid               String?
   nidImageFrontPart String?
+  bloodGroup        String?
+  gender            String?
   nidImageBackPart  String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -87,8 +76,8 @@ model registrationFeeInfo {
   receivedBy String?
   receivedAt DateTime   @default(now())
   notes      String?
-  member     memberInfo @relation(fields: [memberId], references: [id])
-  memberId   Int        @unique
+  member     memberInfo @relation(fields: [memberId], references: [memberId])
+  memberId   String     @unique
 }
 
 model memberInfo {

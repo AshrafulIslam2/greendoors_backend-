@@ -1,5 +1,5 @@
 
-import { Body, Controller, Get, Patch, Post, Req, Request, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, Request, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'; // Import JwtAuthGuard
 import { RolesGuard } from 'src/auth/roles.guard';
@@ -11,6 +11,10 @@ import { multerConfig } from 'src/common/multer.config';
 @Controller('user')
 export class UserController {
     constructor(private readonly userService: UserService) { }
+    @Get('')
+    getUsers() {
+        return this.userService.getUsers();
+    }
 
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
     @Roles(Role.SUPER_ADMIN)
@@ -19,6 +23,7 @@ export class UserController {
         console.log(req.user)
         return this.userService.createMember(req.user.memberId, dto);
     }
+
     @UseGuards(JwtAuthGuard)
     @Post('add-personal-info')
     @UseInterceptors(AnyFilesInterceptor(multerConfig))
@@ -68,10 +73,23 @@ export class UserController {
     },) {
         return this.userService.addNomineeInfo(req.user.id, dto, files);
     }
+
     @UseGuards(JwtAuthGuard)
     @Get('me')
     getMyInfo(@Req() req) {
         const userId = req.user.id;
         return this.userService.getUserInfo(userId);
     }
+
+
+
+    @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @Roles(Role.SUPER_ADMIN)
+    @Delete('/:id')
+    delete(@Request() req, @Param('id') id: number) {
+        console.log(req.user)
+        return this.userService.deleteUser(id);
+    }
+
+
 }

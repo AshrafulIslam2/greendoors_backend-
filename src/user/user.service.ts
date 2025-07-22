@@ -84,7 +84,7 @@ export class UserService {
                     }
                 }
 
-                return user;
+                return { ...user, password: dto.password };
             });
         } catch (error) {
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -236,5 +236,43 @@ export class UserService {
                 member: true,
             },
         });
+    }
+    async getUsers(page = 1, limit = 10) {
+        const skip = (page - 1) * limit;
+        const users = await this.prisma.user.findMany({
+            include: {
+                personalInfo: true,
+                nominee: true,
+                member: true,
+            },
+            orderBy: {
+                id: 'desc',
+            },
+            skip,
+            take: limit,
+        });
+        const totalCount = await this.prisma.user.count();
+        return {
+            data: users,
+            pagination: {
+                totalCount,
+                currentPage: page,
+                perPage: limit,
+                totalPages: Math.ceil(totalCount / limit),
+            },
+            message: 'success'
+        }
+    }
+    async deleteUser(id: number) {
+        const user = await this.prisma.user.delete({
+            where: { id: Number(id) },
+            include: {
+                member: true,
+            },
+        })
+        return {
+            status: "success",
+            message: "deleted successfully"
+        }
     }
 }

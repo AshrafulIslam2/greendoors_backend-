@@ -17,6 +17,9 @@ async function main() {
                 totalProfit: 0,
                 totalLoss: 0,
                 availableCash: 0,
+                totalLateFee: 0,
+                totalRegistrationFee: 0,
+                updatedAt: new Date(),
             },
         });
         console.log('✅ CashBalance record created.');
@@ -39,7 +42,9 @@ async function main() {
                     joiningDate: new Date('2019-10-01'),
                     registrationFeeInfo: {
                         create: {
-                            amount: 500
+                            amount: 500,
+                            receivedAt: new Date('2019-10-01'),
+                            receivedBy: "1901",
                         }
                     }
 
@@ -47,17 +52,19 @@ async function main() {
             }
         },
     })
-    await this.prisma.cashBalance.update({
-        where: { id: cashBalance.id }, // or however you identify your singleton CashBalance row
-        data: {
-            totalDeposit: {
-                increment: 500,
+    if (cashBalance?.id) {
+        await prisma.cashBalance.update({
+            where: { id: cashBalance.id },
+            data: {
+                totalRegistrationFee: {
+                    increment: 500,
+                },
+                availableCash: {
+                    increment: 500
+                },
             },
-            availableCash: {
-                increment: 500
-            },
-        },
-    });
+        });
+    }
 
     console.log('Super Admin created:', superAdmin)
 }
