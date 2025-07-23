@@ -14,8 +14,7 @@ export class AuthService {
     }
 
     async validUser(email: string, password: string) {
-        console.log('email:', email);
-        const user = await this.prisma.user.findUnique({ where: { email }, include: { member: true }, });
+        const user = await this.prisma.user.findUnique({ where: { email }, include: { member: true, personalInfo: true }, });
         if (!user || !(await compare(password, user.password))) {
             // Throw error if user not found or password doesn't match
             throw new UnauthorizedException('Invalid credentials');
@@ -24,13 +23,15 @@ export class AuthService {
     }
 
     async login(email: string, password: string) {
-        console.log(email)
+        console.log(email, password)
         const user = await this.validUser(email, password);
-        const payload = { id: user.id, email: user.email, role: user.role, memberId: user.member?.memberId, };
+        const payload = { id: user.id, email: user.email, role: user.role, memberId: user.member?.memberId };
+        console.log("payload", payload)
         const token = this.jwtService.sign(payload);
+        console.log("token", token)
         return {
             accessToken: token, // Fixed typo: accessToke → accessToken
-            user: { id: user.id, email: user.email, role: user.role, name: user.name, userPersonalInfo: user.userPersonalInfoId, nomineeId: user.nomineeId, memberId: user.member?.memberId },
+            user: { id: user.id, email: user.email, role: user.role, profileImage: user.personalInfo?.ProfileImage || null, name: user.name, userPersonalInfo: user.userPersonalInfoId, nomineeId: user.nomineeId, memberId: user.member?.memberId },
         };
     }
 }
