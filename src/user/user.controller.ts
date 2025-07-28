@@ -1,5 +1,5 @@
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, Request, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Request, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'; // Import JwtAuthGuard
 import { RolesGuard } from 'src/auth/roles.guard';
@@ -12,8 +12,10 @@ import { multerConfig } from 'src/common/multer.config';
 export class UserController {
     constructor(private readonly userService: UserService) { }
     @Get('')
-    getUsers() {
-        return this.userService.getUsers();
+    getUsers(@Query('page') page: number = 1,
+        @Query('limit') limit: number = 10) {
+        console.log("ash")
+        return this.userService.getUsers(page, limit);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
@@ -27,26 +29,43 @@ export class UserController {
     @UseGuards(JwtAuthGuard)
     @Post('add-personal-info')
     @UseInterceptors(AnyFilesInterceptor(multerConfig))
-    addPersonalInfo(@Request() req, @Body() dto: any, @UploadedFiles()
+    async addPersonalInfo(@Request() req, @Body() dto: any, @UploadedFiles()
     files: {
         ProfileImage?: Express.Multer.File[];
         nidImageFrontPart?: Express.Multer.File[];
         nidImageBackPart?: Express.Multer.File[];
     },) {
         console.log("===as", files)
-        return this.userService.addPersonalInfo(req.user.id, dto, files);
+        try {
+            const result = await this.userService.addPersonalInfo(req.user.id, dto, files);
+            console.log("🚀 ~ UserController ~ addPersonalInfo ~ dto:", dto)
+            return { success: true, data: result };
+        } catch (error) {
+            if (error.code === 'LIMIT_FILE_SIZE') {
+                throw new BadRequestException('File size exceeds the 2MB limit.');
+            }
+            throw new BadRequestException('Failed to process nominee information.');
+        }
     }
 
     @UseGuards(JwtAuthGuard)
     @Patch('add-personal-info/update')
     @UseInterceptors(AnyFilesInterceptor(multerConfig))
-    updatePersonalInfo(@Request() req, @Body() dto: any, @UploadedFiles()
+    async updatePersonalInfo(@Request() req, @Body() dto: any, @UploadedFiles()
     files: {
         ProfileImage?: Express.Multer.File[];
         nidImageFrontPart?: Express.Multer.File[];
         nidImageBackPart?: Express.Multer.File[];
     },) {
-        return this.userService.addPersonalInfo(req.user.id, dto, files);
+        try {
+            const result = await this.userService.addPersonalInfo(req.user.id, dto, files);
+            return { success: true, data: result };
+        } catch (error) {
+            if (error.code === 'LIMIT_FILE_SIZE') {
+                throw new BadRequestException('File size exceeds the 2MB limit.');
+            }
+            throw new BadRequestException('Failed to process nominee information.');
+        }
     }
 
     @UseGuards(JwtAuthGuard)
@@ -65,13 +84,21 @@ export class UserController {
     @UseGuards(JwtAuthGuard)
     @Post('add-nominee-info')
     @UseInterceptors(AnyFilesInterceptor(multerConfig))
-    addNomineeInfo(@Request() req, @Body() dto: any, @UploadedFiles()
+    async addNomineeInfo(@Request() req, @Body() dto: any, @UploadedFiles()
     files: {
-        ProfileImage?: Express.Multer.File[];
+        // ProfileImage?: Express.Multer.File[];
         nidImageFrontPart?: Express.Multer.File[];
         nidImageBackPart?: Express.Multer.File[];
     },) {
-        return this.userService.addNomineeInfo(req.user.id, dto, files);
+        try {
+            const result = await this.userService.addNomineeInfo(req.user.id, dto, files);
+            return { success: true, data: result };
+        } catch (error) {
+            if (error.code === 'LIMIT_FILE_SIZE') {
+                throw new BadRequestException('File size exceeds the 2MB limit.');
+            }
+            throw new BadRequestException('Failed to process nominee information.');
+        }
     }
 
     @UseGuards(JwtAuthGuard)

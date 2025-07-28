@@ -5,4 +5,7 @@ import { memoryStorage } from 'multer';
 
 export const multerConfig: MulterOptions = {
     storage: memoryStorage(),
+    limits: {
+        fileSize: 2 * 1024 * 1024, // 2MB limit (in bytes)
+    },
 };

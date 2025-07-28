@@ -14,7 +14,7 @@ import { JwtStrategy } from './jwt.strategy';
     PassportModule.register({ defaultStrategy: 'jwt' }), // Register Passport with JWT as default strategy
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'secret', // Use environment variable in production
-      signOptions: { expiresIn: '1h' }, // Optional: configure token expiration
+      signOptions: { expiresIn: '14d' }, // Optional: configure token expiration
     }),
   ],
   controllers: [AuthController],

@@ -87,9 +87,10 @@ export class UserService {
                 return { ...user, password: dto.password };
             });
         } catch (error) {
+            console.log("🚀 ~ UserService ~ createMember ~ error:", error)
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
                 throw new BadRequestException(
-                    `A user with the member ID '${dto.memberId}' already exists. Please use a different member ID.`,
+                    `A user with the member ID '${dto.memberId}' or  '${dto.email}'already exists. Please use a different member ID. or Email`,
                 );
             }
             // Rethrow other errors to be handled by a global exception filter or controller
@@ -246,10 +247,10 @@ export class UserService {
                 member: true,
             },
             orderBy: {
-                id: 'desc',
+                id: 'asc',
             },
             skip,
-            take: limit,
+            take: Number(limit),
         });
         const totalCount = await this.prisma.user.count();
         return {
