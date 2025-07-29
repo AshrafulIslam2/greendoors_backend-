@@ -7,6 +7,7 @@ import axios from 'axios';
 @Injectable()
 export class UserService {
     constructor(private readonly prisma: PrismaService) { }
+
     private async uploadToImgBB(file: Express.Multer.File): Promise<string> {
         console.log("ash", file)
         const base64 = file.buffer.toString('base64');
@@ -103,7 +104,7 @@ export class UserService {
     async addPersonalInfo(userId: number, dto: any, files) {
         const existingInfo = await this.prisma.userPersonalInfo.findFirst({
             where: {
-                user: { id: userId }, // Assumes userId is the foreign key in userPersonalInfo
+                user: { id: userId },
             },
         });
 
@@ -113,7 +114,8 @@ export class UserService {
             }
             acc[file.fieldname].push(file);
             return acc;
-        }, {} as Record<string, Express.Multer.File[]>);;
+        }, {} as Record<string, Express.Multer.File[]>);
+
         const profileImageUrl = fileMap.ProfileImage
             ? await this.uploadToImgBB(fileMap.ProfileImage[0])
             : existingInfo?.ProfileImage || null;
@@ -124,47 +126,71 @@ export class UserService {
             ? await this.uploadToImgBB(fileMap.nidImageBackPart[0])
             : existingInfo?.nidImageBackPart || null;
 
-        if (existingInfo) {
-            const updatedInfo = await this.prisma.userPersonalInfo.update({
-                where: { id: existingInfo.id },
-                data: {
-                    ...dto,
-                    ProfileImage: profileImageUrl,
-                    nidImageFrontPart: nidFrontUrl,
-                    nidImageBackPart: nidBackUrl,
-                },
-            });
-            return updatedInfo;
-        }
-        const info = await this.prisma.userPersonalInfo.create({
-            data: {
-                ...dto,
-                ProfileImage: profileImageUrl,
-                nidImageFrontPart: nidFrontUrl,
-                nidImageBackPart: nidBackUrl,
-                user: {
-                    connect: {
+        // Use transaction to ensure both updates happen together
+        const result = await this.prisma.$transaction(async (prisma) => {
+            let updatedInfo;
+
+            if (existingInfo) {
+                updatedInfo = await prisma.userPersonalInfo.update({
+                    where: { id: existingInfo.id },
+                    data: {
+                        ...dto,
+                        ProfileImage: profileImageUrl,
+                        nidImageFrontPart: nidFrontUrl,
+                        nidImageBackPart: nidBackUrl,
+                    },
+                });
+            } else {
+                updatedInfo = await prisma.userPersonalInfo.create({
+                    data: {
+                        ...dto,
+                        ProfileImage: profileImageUrl,
+                        nidImageFrontPart: nidFrontUrl,
+                        nidImageBackPart: nidBackUrl,
+                        user: {
+                            connect: {
+                                id: userId
+                            }
+                        }
+                    }
+                });
+
+                // Connect the personal info to user if it's a new record
+                await prisma.user.update({
+                    where: {
                         id: userId
+                    },
+                    data: {
+                        personalInfo: {
+                            connect: {
+                                id: updatedInfo.id
+                            }
+                        }
                     }
-                }
+                });
             }
-        })
 
-        await this.prisma.user.update({
-            where: {
-                id: userId
-            },
-            data: {
-                personalInfo: {
-                    connect: {
-                        id: info.id
-                    }
-                }
+            // Update User table if name or email is provided in dto
+            const userUpdateData: any = {};
+            if (dto.name !== undefined) {
+                userUpdateData.name = dto.name;
             }
-        })
+            if (dto.email !== undefined) {
+                userUpdateData.email = dto.email;
+            }
 
-        return info;
+            // Only update User table if there are fields to update
+            if (Object.keys(userUpdateData).length > 0) {
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: userUpdateData
+                });
+            }
 
+            return updatedInfo;
+        });
+
+        return result;
     }
 
     //add nominee info and update nominee info
@@ -238,10 +264,22 @@ export class UserService {
             },
         });
     }
+
+    //Get All Members Table
     async getUsers(page = 1, limit = 10) {
         const skip = (page - 1) * limit;
         const users = await this.prisma.user.findMany({
-            include: {
+            where: {
+                isDeleted: false,
+                isActive: true,
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                userPersonalInfoId: true,
+                nomineeId: true,
+                memberInfoId: true,
                 personalInfo: true,
                 nominee: true,
                 member: true,
@@ -252,7 +290,12 @@ export class UserService {
             skip,
             take: Number(limit),
         });
-        const totalCount = await this.prisma.user.count();
+        const totalCount = await this.prisma.user.count({
+            where: {
+                isDeleted: false,
+                isActive: true
+            }
+        });
         return {
             data: users,
             pagination: {
@@ -264,16 +307,185 @@ export class UserService {
             message: 'success'
         }
     }
-    async deleteUser(id: number) {
-        const user = await this.prisma.user.delete({
-            where: { id: Number(id) },
-            include: {
-                member: true,
+
+
+
+
+    // Updated softDeleteUser method
+    async softDeleteUser(userId: number, deletedByAdminId: number, reason?: string) {
+        return await this.prisma.$transaction(async (prisma) => {
+            const user = await prisma.user.findUnique({
+                where: { id: Number(userId) },
+                include: { member: true }
+            });
+
+            if (!user) {
+                throw new NotFoundException('User not found');
+            }
+
+            if (user.isDeleted) {
+                throw new BadRequestException('User is already deleted');
+            }
+
+            const { hasFinancialData, hasOnlyRegistration } = await this.checkFinancialTransactions(userId);
+
+            if (hasFinancialData) {
+                // Soft delete for users with significant financial data
+                const deletedUser = await prisma.user.update({
+                    where: { id: Number(userId) },
+                    data: {
+                        isActive: false,
+                        isDeleted: true,
+                        deletedAt: new Date(),
+                        deletedBy: deletedByAdminId,
+                        deletionReason: reason,
+                        email: `deleted_${userId}_${Date.now()}@deleted.local`
+                    }
+                });
+
+                if (user.member) {
+                    await prisma.memberInfo.update({
+                        where: { id: Number(user.member.id) },
+                        data: {
+                            isActive: false,
+                            isDeleted: true,
+                            deletedAt: new Date()
+                        }
+                    });
+                }
+
+                return {
+                    message: 'User soft deleted successfully',
+                    user: deletedUser,
+                    preservedData: 'Financial records preserved'
+                };
+            } else {
+                // Hard delete for users with no financial data or only registration fee
+                const result = await this.hardDeleteUser(userId);
+                return {
+                    ...result,
+                    note: hasOnlyRegistration
+                        ? 'User had only registration fee - safe to delete'
+                        : 'User had no financial data - safe to delete'
+                };
+            }
+        });
+    }
+    // Updated softDeleteUser method Supportive function
+    private async checkFinancialTransactions(userId: number): Promise<{ hasFinancialData: boolean, hasOnlyRegistration: boolean }> {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: Number(userId)
             },
-        })
+            include: {
+                member: {
+                    include: {
+                        deposits: true,
+                        registrationFeeInfo: true,
+                        lateFees: true,
+                        PettyCashExpense: true,
+                        Investment: true
+                    }
+                }
+            }
+        });
+
+        if (!user?.member) return { hasFinancialData: false, hasOnlyRegistration: false };
+
+        const hasDeposits = user.member.deposits.length > 0;
+        const hasLateFees = user.member.lateFees.length > 0;
+        const hasPettyCash = user.member.PettyCashExpense.length > 0;
+        const hasInvestments = user.member.Investment.length > 0;
+        const hasRegistrationFee = !!user.member.registrationFeeInfo;
+
+        const hasSignificantFinancialData = hasDeposits || hasLateFees || hasPettyCash || hasInvestments;
+        const hasOnlyRegistration = hasRegistrationFee && !hasSignificantFinancialData;
+
         return {
-            status: "success",
-            message: "deleted successfully"
-        }
+            hasFinancialData: hasSignificantFinancialData,
+            hasOnlyRegistration
+        };
+    }
+    ///Hard Delete Function if on have registration Fee
+    private async hardDeleteUser(userId: number) {
+        return await this.prisma.$transaction(async (prisma) => {
+            const user = await prisma.user.findUnique({
+                where: { id: Number(userId) },
+                include: {
+                    member: {
+                        include: {
+                            registrationFeeInfo: true
+                        }
+                    },
+                    personalInfo: true,
+                    nominee: true
+                }
+            });
+
+            if (!user) {
+                throw new NotFoundException('User not found');
+            }
+            let registrationAmount = 0;
+            // Delete in correct order due to foreign key constraints
+
+            // 1. Delete member-related data if member exists
+            if (user.member) {
+                // Delete registration fee info (this is okay to delete for new members)
+                if (user.member.registrationFeeInfo) {
+                    registrationAmount = Number(user.member.registrationFeeInfo.amount);
+                    await prisma.registrationFeeInfo.delete({
+                        where: { memberId: user.member.memberId }
+                    });
+                }
+
+                // Delete member info
+                await prisma.memberInfo.delete({
+                    where: { id: user.member.id }
+                });
+            }
+
+            // 2. Delete personal info if exists
+            if (user.personalInfo) {
+                await prisma.userPersonalInfo.delete({
+                    where: { id: user.personalInfo.id }
+                });
+            }
+
+            // 3. Delete nominee if exists
+            if (user.nominee) {
+                await prisma.nominee.delete({
+                    where: { id: user.nominee.id }
+                });
+            }
+            // 4. Update CashBalance if there was a registration fee
+            if (registrationAmount > 0) {
+                const cashBalance = await prisma.cashBalance.findFirst();
+
+                if (cashBalance) {
+                    await prisma.cashBalance.update({
+                        where: { id: cashBalance.id },
+                        data: {
+                            totalRegistrationFee: {
+                                decrement: registrationAmount,
+                            },
+                            availableCash: {
+                                decrement: registrationAmount,
+                            },
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+            }
+            // 5. Finally delete the user
+            await prisma.user.delete({
+                where: { id: Number(userId) }
+            });
+
+            return {
+                message: 'User and all related data permanently deleted',
+                deletedUserId: userId,
+                note: 'User had only registration fee, safe to hard delete'
+            };
+        });
     }
 }

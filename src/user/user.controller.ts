@@ -14,7 +14,6 @@ export class UserController {
     @Get('')
     getUsers(@Query('page') page: number = 1,
         @Query('limit') limit: number = 10) {
-        console.log("ash")
         return this.userService.getUsers(page, limit);
     }
 
@@ -22,7 +21,6 @@ export class UserController {
     @Roles(Role.SUPER_ADMIN)
     @Post('create')
     create(@Request() req, @Body() dto: any) {
-        console.log(req.user)
         return this.userService.createMember(req.user.memberId, dto);
     }
 
@@ -35,10 +33,9 @@ export class UserController {
         nidImageFrontPart?: Express.Multer.File[];
         nidImageBackPart?: Express.Multer.File[];
     },) {
-        console.log("===as", files)
+
         try {
             const result = await this.userService.addPersonalInfo(req.user.id, dto, files);
-            console.log("🚀 ~ UserController ~ addPersonalInfo ~ dto:", dto)
             return { success: true, data: result };
         } catch (error) {
             if (error.code === 'LIMIT_FILE_SIZE') {
@@ -113,9 +110,10 @@ export class UserController {
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
     @Roles(Role.SUPER_ADMIN)
     @Delete('/:id')
-    delete(@Request() req, @Param('id') id: number) {
-        console.log(req.user)
-        return this.userService.deleteUser(id);
+    delete(@Request() req, @Param('id') id: number, @Body() deleteDto: { reason?: string },) {
+        const adminId = req.user.id
+        return this.userService.softDeleteUser(id, adminId, deleteDto.reason);
+
     }
 
 

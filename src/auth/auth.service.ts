@@ -15,7 +15,7 @@ export class AuthService {
 
     async validUser(email: string, password: string) {
         const user = await this.prisma.user.findUnique({ where: { email }, include: { member: true, personalInfo: true }, });
-        if (!user || !(await compare(password, user.password))) {
+        if (!user || !(await compare(password, user.password)) || user.isDeleted || !user.isActive) {
             // Throw error if user not found or password doesn't match
             throw new UnauthorizedException('Invalid credentials');
         }

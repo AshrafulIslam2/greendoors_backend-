@@ -25,6 +25,11 @@ model User {
   role               Role              @default(MEMBER)
   member             memberInfo?       @relation(fields: [memberInfoId], references: [id])
   memberInfoId       Int?              @unique
+  isActive           Boolean           @default(true)
+  isDeleted          Boolean           @default(false)
+  deletedAt          DateTime?
+  deletedBy          Int? // ID of admin who deleted
+  deletionReason     String? // Optional reason for deletion
 }
 
 enum Role {
@@ -88,6 +93,9 @@ model memberInfo {
   user                User?
   updatedAt           DateTime             @updatedAt
   createdAt           DateTime             @default(now())
+  isActive            Boolean              @default(true)
+  isDeleted           Boolean              @default(false)
+  deletedAt           DateTime?
   PettyCashExpense    PettyCashExpense[]
   deposits            depositInfo[]        @relation("MemberDeposits")
   lateFees            lateFee[]            @relation("MemberFines")
