@@ -1,12 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { Prisma, Role } from '@prisma/client';
 import axios from 'axios';
+import { EmailService } from 'src/email/email.service';
 
 @Injectable()
 export class UserService {
-    constructor(private readonly prisma: PrismaService) { }
+    private readonly logger = new Logger(UserService.name);
+
+    constructor(private readonly prisma: PrismaService, private emailService: EmailService,) { }
 
     private async uploadToImgBB(file: Express.Multer.File): Promise<string> {
         console.log("ash", file)
@@ -27,7 +30,7 @@ export class UserService {
         const hashedPassword = await bcrypt.hash(dto.password, 10);
 
         try {
-            return await this.prisma.$transaction(async (prisma) => {
+            const result = await this.prisma.$transaction(async (prisma) => {
                 // Create the user and associated member
                 const user = await prisma.user.create({
                     data: {
@@ -77,7 +80,7 @@ export class UserService {
                     } else {
                         await prisma.cashBalance.create({
                             data: {
-                                totalDeposit: dto.registrationAmount,
+                                totalRegistrationFee: dto.registrationAmount,
                                 availableCash: dto.registrationAmount,
                                 updatedAt: new Date(),
                             },
@@ -87,14 +90,38 @@ export class UserService {
 
                 return { ...user, password: dto.password };
             });
+
+            // Send welcome email after successful user creation
+            try {
+                const emailSent = await this.emailService.sendWelcomeEmail(
+                    dto.email,
+                    dto.name,
+                    dto.password,
+                    dto.memberId,
+                );
+
+                if (emailSent) {
+                    this.logger.log(`Welcome email sent successfully to ${dto.email}`);
+                } else {
+                    this.logger.warn(`Failed to send welcome email to ${dto.email}, but user creation succeeded`);
+                }
+            } catch (emailError) {
+                // Log email error but don't fail the entire operation
+                this.logger.error('Failed to send welcome email:', emailError);
+                // You might want to add the email to a queue for retry
+            }
+
+            // Don't return the plain password in the response
+            const { password: _, ...userWithoutPassword } = result;
+            return userWithoutPassword;
+
         } catch (error) {
-            console.log("🚀 ~ UserService ~ createMember ~ error:", error)
+            this.logger.error("Failed to create member:", error);
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
                 throw new BadRequestException(
-                    `A user with the member ID '${dto.memberId}' or  '${dto.email}'already exists. Please use a different member ID. or Email`,
+                    `A user with the member ID '${dto.memberId}' or email '${dto.email}' already exists. Please use a different member ID or email.`,
                 );
             }
-            // Rethrow other errors to be handled by a global exception filter or controller
             throw error;
         }
     }
