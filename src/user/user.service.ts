@@ -87,6 +87,13 @@ export class UserService {
                         });
                     }
                 }
+                await prisma.cashBalanceMember.create({
+                    data: {
+                        memberId: dto.memberId,
+                        totalRegistrationFee: dto.registrationAmount || 0,
+                        updatedAt: new Date(),
+                    },
+                });
 
                 return { ...user, password: dto.password };
             });
@@ -125,7 +132,23 @@ export class UserService {
             throw error;
         }
     }
-
+    async getUserById(memberId: string) {
+        // Find the user by memberId (from memberInfo)
+        const user = await this.prisma.user.findFirst({
+            where: {
+                member: { memberId },
+            },
+            select: {
+                name: true,
+                email: true,
+                role: true,
+                personalInfo: true,
+                nominee: true,
+                member: true,
+            },
+        });
+        return user;
+    }
 
     //add Personal Info and update member personal info
     async addPersonalInfo(userId: number, dto: any, files) {

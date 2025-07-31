@@ -24,10 +24,7 @@ export class DepositService {
             );
         }
     }
-
     async addDeposit(dto: any) {
-
-
         if (!dto.amount || dto.amount <= 0) {
             throw new BadRequestException("Deposit amount must be greater than zero");
         }
@@ -64,12 +61,12 @@ export class DepositService {
                         year,
                         month,
                         day,
-                        // memberId: "1901",
                         member: {
                             connect: { id: member.id },
                         },
                     },
                 });
+
                 if (dto.is_fine_waived) {
                     await prisma.lateFee.create({
                         data: {
@@ -79,8 +76,7 @@ export class DepositService {
                             depositInfoId: deposit.id,
                         },
                     });
-                }
-                else {
+                } else {
                     await prisma.lateFee.create({
                         data: {
                             amount: lateFeeAmount,
@@ -91,6 +87,7 @@ export class DepositService {
                     });
                 }
 
+                // Update global cash balance
                 const cashBalance = await prisma.cashBalance.findFirst();
                 if (cashBalance) {
                     await prisma.cashBalance.update({
@@ -117,6 +114,33 @@ export class DepositService {
                         },
                     });
                 }
+
+                // Update or create member cash balance
+                const memberCashBalance = await prisma.cashBalanceMember.findUnique({
+                    where: { memberId: dto.memberId },
+                });
+                if (memberCashBalance) {
+                    await prisma.cashBalanceMember.update({
+                        where: { memberId: dto.memberId },
+                        data: {
+                            totalDeposit: { increment: adjustedDepositAmount },
+                            availableCash: { increment: dto.amount },
+                            totalLateFee: { increment: dto.is_fine_waived ? 0 : lateFeeAmount },
+                            updatedAt: new Date(),
+                        },
+                    });
+                } else {
+                    await prisma.cashBalanceMember.create({
+                        data: {
+                            memberId: dto.memberId,
+                            totalDeposit: adjustedDepositAmount,
+                            availableCash: dto.amount,
+                            totalLateFee: dto.is_fine_waived ? 0 : lateFeeAmount,
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+
                 return deposit; // ✅ Return the created deposit
             });
 
@@ -232,8 +256,6 @@ export class DepositService {
             throw new BadRequestException("Failed to update deposit: " + error.message);
         }
     }
-
-
     async getDeposit(page = 1, limit = 10) {
         const skip = (page - 1) * limit;
 
@@ -395,6 +417,63 @@ export class DepositService {
             return result;
         } catch (error) {
             throw new BadRequestException('Failed to delete deposit: ' + error.message);
+        }
+    }
+    async getCashBalance() {
+        try {
+            const data = await this.prisma.cashBalance.findFirst();
+            if (data) {
+                return {
+                    status: "success",
+                    message: "Cash balance fetched successfully.",
+                    data,
+                };
+            } else {
+                return {
+                    status: "fail",
+                    message: "No cash balance record found.",
+                    data: null,
+                };
+            }
+        } catch (error) {
+            return {
+                status: "fail",
+                message: error.message || "Failed to fetch cash balance.",
+                data: null,
+            };
+        }
+    }
+    async memberCashBalance(memberId: string) {
+        try {
+            const data = await this.prisma.cashBalanceMember.findFirst({
+                where: { memberId }, select: {
+                    totalDeposit: true,
+                    availableCash: true,
+                    totalLateFee: true,
+                    totalLoss: true,
+                    totalProfit: true,
+                    updatedAt: true,
+                },
+            });
+            if (data) {
+                return {
+                    status: "success",
+                    message: "Member cash balance fetched successfully.",
+                    data,
+                };
+            } else {
+                return {
+                    status: "fail",
+                    message: "No cash balance record found for this member.",
+                    data: null,
+                };
+            }
+        } catch (error) {
+            return {
+                status: "fail",
+                message: error.message || "Failed to fetch member cash balance.",
+                data: null,
+            };
         }
     }
 

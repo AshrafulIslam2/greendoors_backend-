@@ -54,6 +54,18 @@ export class DepositController {
         console.log(user)
         return this.depositService.deleteDeposit(id);
     }
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPER_ADMIN) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @Post('/cashbalance')
+    async cashBalance() {
+        return this.depositService.getCashBalance();
+    }
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPER_ADMIN) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @Post('/cashbalance/:memberId')
+    async memberCashBalance(@Param('memberId') memberId: string) {
+        return this.depositService.memberCashBalance(memberId);
+    }
 
 
 

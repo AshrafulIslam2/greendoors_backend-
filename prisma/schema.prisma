@@ -101,6 +101,7 @@ model memberInfo {
   lateFees            lateFee[]            @relation("MemberFines")
   registrationFeeInfo registrationFeeInfo?
   Investment          Investment[]
+  cashBalanceMember   CashBalanceMember?
 }
 
 model depositInfo {
@@ -114,6 +115,8 @@ model depositInfo {
   day         Int
   member      memberInfo @relation("MemberDeposits", fields: [memberId], references: [memberId])
   memberId    String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
   lateFee     lateFee?   @relation
 }
 
@@ -130,15 +133,28 @@ model lateFee {
 
 model CashBalance {
   id                   Int      @id @default(autoincrement())
+  availableCash        Decimal  @default(0) @db.Decimal(10, 2)
   totalDeposit         Decimal  @default(0) @db.Decimal(10, 2)
+  totalLateFee         Decimal  @default(0) @db.Decimal(10, 2)
   totalExpense         Decimal  @default(0) @db.Decimal(10, 2)
   totalInvestment      Decimal  @default(0) @db.Decimal(10, 2)
   totalProfit          Decimal  @default(0) @db.Decimal(10, 2)
-  totalLateFee         Decimal  @default(0) @db.Decimal(10, 2)
-  totalRegistrationFee Decimal  @default(0) @db.Decimal(10, 2)
   totalLoss            Decimal  @default(0) @db.Decimal(10, 2)
-  availableCash        Decimal  @default(0) @db.Decimal(10, 2)
+  totalRegistrationFee Decimal  @default(0) @db.Decimal(10, 2)
   updatedAt            DateTime @updatedAt
+}
+
+model CashBalanceMember {
+  id                   Int        @id @default(autoincrement())
+  memberId             String     @unique
+  member               memberInfo @relation(fields: [memberId], references: [memberId])
+  totalDeposit         Decimal    @default(0) @db.Decimal(10, 2)
+  totalProfit          Decimal    @default(0) @db.Decimal(10, 2)
+  totalLateFee         Decimal    @default(0) @db.Decimal(10, 2)
+  totalRegistrationFee Decimal    @default(0) @db.Decimal(10, 2)
+  totalLoss            Decimal    @default(0) @db.Decimal(10, 2)
+  availableCash        Decimal    @default(0) @db.Decimal(10, 2)
+  updatedAt            DateTime   @updatedAt
 }
 
 model PettyCashExpense {
@@ -177,4 +193,13 @@ enum InvestmentStatus {
   PROFIT // investment gained profit
   LOSS // investment lost money
   CLOSED // closed with no profit or loss
+  CANCELLED // investment cancelled before end date
+  COMPLETE // investment completed with profit or loss realized
+  IN_PROGRESS // investment is ongoing, but not yet completed
+  FAILED // investment did not yield expected results or was unsuccessful
+  ON_HOLD // investment temporarily paused or delayed
+  REVIEW // investment under review for potential issues or adjustments
+  ARCHIVED // investment completed and archived for records
+  REJECTED // investment proposal rejected before funding
+  APPROVED // investment proposal approved for funding
 }

@@ -16,16 +16,22 @@ export class UserController {
         @Query('limit') limit: number = 10) {
         return this.userService.getUsers(page, limit);
     }
+    // @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    // @Roles(Role.SUPER_ADMIN)
+    // @Get('/:id')
+    // getUserById(@Param('id') id: string) {
+    //     return this.userService.getUserById(id);
+    // }
 
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
     @Roles(Role.SUPER_ADMIN)
-    @Post('create')
+    @Post('/create')
     create(@Request() req, @Body() dto: any) {
         return this.userService.createMember(req.user.memberId, dto);
     }
 
     @UseGuards(JwtAuthGuard)
-    @Post('add-personal-info')
+    @Post('/add-personal-info')
     @UseInterceptors(AnyFilesInterceptor(multerConfig))
     async addPersonalInfo(@Request() req, @Body() dto: any, @UploadedFiles()
     files: {
@@ -46,7 +52,7 @@ export class UserController {
     }
 
     @UseGuards(JwtAuthGuard)
-    @Patch('add-personal-info/update')
+    @Patch('/add-personal-info/update')
     @UseInterceptors(AnyFilesInterceptor(multerConfig))
     async updatePersonalInfo(@Request() req, @Body() dto: any, @UploadedFiles()
     files: {
@@ -66,7 +72,7 @@ export class UserController {
     }
 
     @UseGuards(JwtAuthGuard)
-    @Patch('add-nominee-info/update')
+    @Patch('/add-nominee-info/update')
     @UseInterceptors(AnyFilesInterceptor(multerConfig))
     updateNomineeInfo(@Request() req, @Body() dto: any, @UploadedFiles()
     files: {
@@ -79,7 +85,7 @@ export class UserController {
 
 
     @UseGuards(JwtAuthGuard)
-    @Post('add-nominee-info')
+    @Post('/add-nominee-info')
     @UseInterceptors(AnyFilesInterceptor(multerConfig))
     async addNomineeInfo(@Request() req, @Body() dto: any, @UploadedFiles()
     files: {
@@ -99,13 +105,18 @@ export class UserController {
     }
 
     @UseGuards(JwtAuthGuard)
-    @Get('me')
+    @Get('/me')
     getMyInfo(@Req() req) {
         const userId = req.user.id;
         return this.userService.getUserInfo(userId);
     }
 
-
+    @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @Roles(Role.SUPER_ADMIN)
+    @Get('member/:id')
+    getUserById(@Param('id') id: string) {
+        return this.userService.getUserById(id);
+    }
 
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
     @Roles(Role.SUPER_ADMIN)
@@ -116,5 +127,10 @@ export class UserController {
 
     }
 
-
+    // @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    // @Roles(Role.SUPER_ADMIN)
+    // @Get('/:id')
+    // getUserById(@Param('id') id: string) {
+    //     return this.userService.getUserById(id);
+    // }
 }
