@@ -6,11 +6,13 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt.strategy';
+import { EmailModule } from 'src/email/email.module';
 
 
 @Module({
   imports: [
     PrismaModule,
+    EmailModule,
     PassportModule.register({ defaultStrategy: 'jwt' }), // Register Passport with JWT as default strategy
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'secret', // Use environment variable in production

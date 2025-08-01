@@ -14,22 +14,24 @@ datasource db {
 }
 
 model User {
-  id                 Int               @id @default(autoincrement())
-  name               String?
-  email              String            @unique
-  password           String
-  personalInfo       userPersonalInfo? @relation(fields: [userPersonalInfoId], references: [id])
-  userPersonalInfoId Int?              @unique
-  nominee            Nominee?          @relation(fields: [nomineeId], references: [id])
-  nomineeId          Int?              @unique
-  role               Role              @default(MEMBER)
-  member             memberInfo?       @relation(fields: [memberInfoId], references: [id])
-  memberInfoId       Int?              @unique
-  isActive           Boolean           @default(true)
-  isDeleted          Boolean           @default(false)
-  deletedAt          DateTime?
-  deletedBy          Int? // ID of admin who deleted
-  deletionReason     String? // Optional reason for deletion
+  id                  Int                  @id @default(autoincrement())
+  name                String?
+  email               String               @unique
+  password            String
+  personalInfo        userPersonalInfo?    @relation(fields: [userPersonalInfoId], references: [id])
+  userPersonalInfoId  Int?                 @unique
+  nominee             Nominee?             @relation(fields: [nomineeId], references: [id])
+  nomineeId           Int?                 @unique
+  role                Role                 @default(MEMBER)
+  member              memberInfo?          @relation(fields: [memberInfoId], references: [id])
+  memberInfoId        Int?                 @unique
+  isActive            Boolean              @default(true)
+  isDeleted           Boolean              @default(false)
+  deletedAt           DateTime?
+  deletedBy           Int? // ID of admin who deleted
+  deletionReason      String?
+  isFirstLogin        Boolean              @default(true) // Added for first-time login
+  passwordResetTokens PasswordResetToken[] // Relation to reset tokens
 }
 
 enum Role {
@@ -202,4 +204,14 @@ enum InvestmentStatus {
   ARCHIVED // investment completed and archived for records
   REJECTED // investment proposal rejected before funding
   APPROVED // investment proposal approved for funding
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  used      Boolean  @default(false)
 }
