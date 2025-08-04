@@ -127,10 +127,10 @@ export class UserController {
 
     }
 
-    // @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
-    // @Roles(Role.SUPER_ADMIN)
-    // @Get('/:id')
-    // getUserById(@Param('id') id: string) {
-    //     return this.userService.getUserById(id);
-    // }
+    @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @Roles(Role.SUPER_ADMIN)
+    @Get('/member-list')
+    getMemberList() {
+        return this.userService.getMemberList();
+    }
 }

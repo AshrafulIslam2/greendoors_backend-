@@ -107,19 +107,20 @@ model memberInfo {
 }
 
 model depositInfo {
-  id          Int        @id @default(autoincrement())
-  amount      Decimal    @db.Decimal(10, 2)
-  depositDate DateTime
-  notes       String?
-  depositSlip String?
-  year        Int
-  month       Int
-  day         Int
-  member      memberInfo @relation("MemberDeposits", fields: [memberId], references: [memberId])
-  memberId    String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  lateFee     lateFee?   @relation
+  id             Int        @id @default(autoincrement())
+  amount         Decimal    @db.Decimal(10, 2)
+  depositDate    DateTime
+  notes          String?
+  depositSlip    String?
+  year           Int
+  month          Int
+  day            Int
+  is_fine_waived Boolean    @default(false) // Indicates if fine was waived for this deposit
+  member         memberInfo @relation("MemberDeposits", fields: [memberId], references: [memberId])
+  memberId       String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  lateFee        lateFee?   @relation
 }
 
 model lateFee {

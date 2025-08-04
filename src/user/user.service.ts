@@ -87,13 +87,13 @@ export class UserService {
                         });
                     }
                 }
-                await prisma.cashBalanceMember.create({
-                    data: {
-                        memberId: dto.memberId,
-                        totalRegistrationFee: dto.registrationAmount || 0,
-                        updatedAt: new Date(),
-                    },
-                });
+                // await prisma.cashBalanceMember.create({
+                //     data: {
+                //         memberId: dto.memberId,
+                //         totalRegistrationFee: dto.registrationAmount || 0,
+                //         updatedAt: new Date(),
+                //     },
+                // });
 
                 return { ...user, password: dto.password };
             });
@@ -358,7 +358,17 @@ export class UserService {
         }
     }
 
-
+    async getMemberList() {
+        const members = await this.prisma.memberInfo.findMany({
+            select: {
+                memberId: true,
+            }
+        })
+        return {
+            data: members.map(member => member.memberId),
+            message: 'Member list retrieved successfully'
+        };
+    }
 
 
     // Updated softDeleteUser method
@@ -434,12 +444,13 @@ export class UserService {
                         registrationFeeInfo: true,
                         lateFees: true,
                         PettyCashExpense: true,
-                        Investment: true
+                        Investment: true,
+                        cashBalanceMember: true
                     }
                 }
             }
         });
-
+        console.log("ash", user)
         if (!user?.member) return { hasFinancialData: false, hasOnlyRegistration: false };
 
         const hasDeposits = user.member.deposits.length > 0;
@@ -447,8 +458,9 @@ export class UserService {
         const hasPettyCash = user.member.PettyCashExpense.length > 0;
         const hasInvestments = user.member.Investment.length > 0;
         const hasRegistrationFee = !!user.member.registrationFeeInfo;
+        const hasCashBalance = user.member.cashBalanceMember !== null;
 
-        const hasSignificantFinancialData = hasDeposits || hasLateFees || hasPettyCash || hasInvestments;
+        const hasSignificantFinancialData = hasDeposits || hasLateFees || hasPettyCash || hasInvestments || hasCashBalance;
         const hasOnlyRegistration = hasRegistrationFee && !hasSignificantFinancialData;
 
         return {

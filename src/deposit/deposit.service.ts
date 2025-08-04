@@ -25,21 +25,23 @@ export class DepositService {
         }
     }
     async addDeposit(dto: any) {
+        console.log("dto", dto);
         if (!dto.amount || dto.amount <= 0) {
             throw new BadRequestException("Deposit amount must be greater than zero");
         }
 
-        if (!dto.depositData || isNaN(new Date(dto.depositData).getTime())) {
+
+        const depositDate = new Date(dto.depositDate);
+        if (!depositDate || isNaN(new Date(depositDate).getTime())) {
             throw new BadRequestException("Invalid deposit date");
         }
-
-        const depositDate = new Date(dto.depositData);
         await this.checkIfDepositExistsForMonth(dto.memberId, depositDate);
         const day = depositDate.getDate();
         const month = depositDate.getMonth() + 1;
         const year = depositDate.getFullYear();
         const isLate = day > 15;
-        const lateFeeAmount = isLate && !dto.is_fine_waived ? 100 : 0;
+        const isFineWaived = dto.is_fine_waived;
+        const lateFeeAmount = isLate && !isFineWaived ? 100 : 0;
         const adjustedDepositAmount = dto.amount - lateFeeAmount;
 
         try {
@@ -56,27 +58,23 @@ export class DepositService {
 
                 const deposit = await prisma.depositInfo.create({
                     data: {
-                        amount: adjustedDepositAmount,
+                        amount: adjustedDepositAmount ? adjustedDepositAmount : dto.amount,
+                        notes: dto.notes || '',
                         depositDate,
                         year,
                         month,
                         day,
+                        is_fine_waived: dto.is_fine_waived || dto.is_fine_waved || false,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
                         member: {
                             connect: { id: member.id },
                         },
                     },
                 });
 
-                if (dto.is_fine_waived) {
-                    await prisma.lateFee.create({
-                        data: {
-                            amount: 0,
-                            feeDate: depositDate,
-                            memberId: dto.memberId,
-                            depositInfoId: deposit.id,
-                        },
-                    });
-                } else {
+                // Only create late fee record if there's actually a late fee (not waived and date > 15)
+                if (isLate && !isFineWaived) {
                     await prisma.lateFee.create({
                         data: {
                             amount: lateFeeAmount,
@@ -94,7 +92,7 @@ export class DepositService {
                         where: { id: cashBalance.id },
                         data: {
                             totalLateFee: {
-                                increment: dto.is_fine_waived ? 0 : lateFeeAmount,
+                                increment: isFineWaived ? 0 : lateFeeAmount,
                             },
                             totalDeposit: {
                                 increment: adjustedDepositAmount,
@@ -125,7 +123,7 @@ export class DepositService {
                         data: {
                             totalDeposit: { increment: adjustedDepositAmount },
                             availableCash: { increment: dto.amount },
-                            totalLateFee: { increment: dto.is_fine_waived ? 0 : lateFeeAmount },
+                            totalLateFee: { increment: isFineWaived ? 0 : lateFeeAmount },
                             updatedAt: new Date(),
                         },
                     });
@@ -191,15 +189,24 @@ export class DepositService {
 
                 // 2. Update or create lateFee
                 if (existingDeposit.lateFee) {
-                    await prisma.lateFee.update({
-                        where: { id: existingDeposit.lateFee.id },
-                        data: {
-                            amount: lateFeeAmount,
-                            feeDate: depositDate,
-                            memberId: dto.memberId,
-                        },
-                    });
-                } else if (lateFeeAmount > 0) {
+                    if (isLate && !dto.is_fine_waived) {
+                        // Update existing late fee
+                        await prisma.lateFee.update({
+                            where: { id: existingDeposit.lateFee.id },
+                            data: {
+                                amount: lateFeeAmount,
+                                feeDate: depositDate,
+                                memberId: dto.memberId,
+                            },
+                        });
+                    } else {
+                        // Delete existing late fee if fine is waived or not late
+                        await prisma.lateFee.delete({
+                            where: { id: existingDeposit.lateFee.id },
+                        });
+                    }
+                } else if (isLate && !dto.is_fine_waived) {
+                    // Create new late fee only if late and not waived
                     await prisma.lateFee.create({
                         data: {
                             amount: lateFeeAmount,
@@ -269,7 +276,7 @@ export class DepositService {
                 depositDate: 'desc',
             },
             skip,
-            take: limit,
+            take: Number(limit),
         });
 
         // 2. Total count of all deposit records
@@ -316,7 +323,7 @@ export class DepositService {
                 depositDate: 'desc',
             },
             skip,
-            take: limit,
+            take: Number(limit),
         });
 
         // 2. Total count
