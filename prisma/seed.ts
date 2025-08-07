@@ -37,17 +37,16 @@ async function main() {
             name: 'Rasel Riaz Chowdhury',
             member: {
                 create: {
-                    memberId: '1901',
+                    memberId: '1900',
                     type: 'Founder',
                     joiningDate: new Date('2019-10-01'),
                     registrationFeeInfo: {
                         create: {
                             amount: 500,
                             receivedAt: new Date('2019-10-01'),
-                            receivedBy: "1901",
+                            receivedBy: "1900",
                         }
                     }
-
                 }
             }
         },

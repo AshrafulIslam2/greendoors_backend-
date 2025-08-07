@@ -58,8 +58,9 @@ export class DepositService {
 
                 const deposit = await prisma.depositInfo.create({
                     data: {
-                        amount: adjustedDepositAmount ? adjustedDepositAmount : dto.amount,
+                        amount: dto.amount,
                         notes: dto.notes || '',
+                        lateFeeAmount: isLate ? lateFeeAmount : 0, // Store late fee amount if applicable
                         depositDate,
                         year,
                         month,
@@ -95,7 +96,7 @@ export class DepositService {
                                 increment: isFineWaived ? 0 : lateFeeAmount,
                             },
                             totalDeposit: {
-                                increment: adjustedDepositAmount,
+                                increment: dto.amount,
                             },
                             availableCash: {
                                 increment: dto.amount,
@@ -122,7 +123,7 @@ export class DepositService {
                         where: { memberId: dto.memberId },
                         data: {
                             totalDeposit: { increment: adjustedDepositAmount },
-                            availableCash: { increment: dto.amount },
+                            availableCash: { increment: adjustedDepositAmount },
                             totalLateFee: { increment: isFineWaived ? 0 : lateFeeAmount },
                             updatedAt: new Date(),
                         },
@@ -132,8 +133,8 @@ export class DepositService {
                         data: {
                             memberId: dto.memberId,
                             totalDeposit: adjustedDepositAmount,
-                            availableCash: dto.amount,
-                            totalLateFee: dto.is_fine_waived ? 0 : lateFeeAmount,
+                            availableCash: adjustedDepositAmount,
+                            totalLateFee: isFineWaived ? 0 : lateFeeAmount,
                             updatedAt: new Date(),
                         },
                     });
@@ -181,6 +182,7 @@ export class DepositService {
                     data: {
                         amount: adjustedDepositAmount,
                         depositDate,
+                        lateFeeAmount: isLate ? lateFeeAmount : 0,
                         day,
                         month,
                         year,
@@ -223,8 +225,8 @@ export class DepositService {
                 if (cashBalance) {
                     // Get original values
                     const originalDepositAmount = existingDeposit.amount as Prisma.Decimal;
-                    const originalLateFee = existingDeposit.lateFee?.amount
-                        ? (existingDeposit.lateFee.amount as Prisma.Decimal)
+                    const originalLateFee = existingDeposit.lateFeeAmount
+                        ? (existingDeposit.lateFeeAmount as Prisma.Decimal)
                         : new Prisma.Decimal(0);
 
                     // Convert Prisma.Decimal to number for calculations
@@ -232,9 +234,8 @@ export class DepositService {
                     const originalLateFeeNum = originalLateFee.toNumber();
 
                     // Calculate differences
-                    const newTotal = dto.amount; // Total new amount (deposit + late fee)
-                    const originalTotal = originalDepositAmountNum + originalLateFeeNum; // Original total
-                    const depositDiff = adjustedDepositAmount - originalDepositAmountNum; // Change in deposit amount
+
+                    const depositDiff = dto.amount - originalDepositAmountNum; // Change in deposit amount
                     const lateFeeDiff = lateFeeAmount - originalLateFeeNum; // Change in late fee
 
                     // Update cash balance
@@ -311,6 +312,7 @@ export class DepositService {
         };
     }
     async getDepositById(memberId: string, page = 1, limit = 10) {
+        console.log("🚀 ~ DepositService ~ getDepositById ~ memberId:", memberId)
         const skip = (page - 1) * limit;
 
         // 1. Paginated data
@@ -325,6 +327,7 @@ export class DepositService {
             skip,
             take: Number(limit),
         });
+        console.log("🚀 ~ DepositService ~ getDepositById ~ deposits:", deposits)
 
         // 2. Total count
         const totalCount = await this.prisma.depositInfo.count({
@@ -362,31 +365,33 @@ export class DepositService {
         };
     }
     async deleteDeposit(depositId: number) {
+        console.log("🚀 ~ DepositService ~ deleteDeposit ~ depositId:", depositId)
         try {
             const result = await this.prisma.$transaction(async (prisma) => {
                 // 1. Fetch the deposit with its related late fee
                 const deposit = await prisma.depositInfo.findUnique({
                     where: { id: Number(depositId) },
-                    include: { lateFee: true },
+                    include: { lateFee: true, member: true },
                 });
+                console.log("🚀 ~ DepositService ~ deleteDeposit ~ deposit:", deposit)
 
                 if (!deposit) {
                     throw new BadRequestException('Deposit record not found');
                 }
 
-                // 2. Delete the associated late fee (if it exists)
+                // // 2. Delete the associated late fee (if it exists)
                 if (deposit.lateFee) {
                     await prisma.lateFee.delete({
                         where: { id: deposit.lateFee.id },
                     });
                 }
 
-                // 3. Delete the deposit
+                // // 3. Delete the deposit
                 await prisma.depositInfo.delete({
                     where: { id: Number(depositId) },
                 });
 
-                // 4. Update cash balance
+                // // 4. Update cash balance
                 const cashBalance = await prisma.cashBalance.findFirst();
 
                 if (cashBalance) {
@@ -405,13 +410,46 @@ export class DepositService {
                         where: { id: cashBalance.id },
                         data: {
                             totalDeposit: {
-                                decrement: depositAmountNum,
+                                decrement: depositAmountNum - lateFeeAmountNum, // Adjust for late fee
                             },
                             totalLateFee: {
                                 decrement: lateFeeAmountNum,
                             },
                             availableCash: {
-                                decrement: depositAmountNum + lateFeeAmountNum,
+                                decrement: depositAmountNum - lateFeeAmountNum,
+                            },
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+                //<!-- 5. Update member cash balance -->
+                const memberCashBalance = await prisma.cashBalanceMember.findUnique({
+                    where: { memberId: deposit.member.memberId },
+                });
+
+                if (memberCashBalance) {
+                    // Get deposit and late fee amounts
+                    const depositAmount = deposit.amount as Prisma.Decimal;
+                    const lateFeeAmount = deposit.lateFee?.amount
+                        ? (deposit.lateFee.amount as Prisma.Decimal)
+                        : new Prisma.Decimal(0);
+
+                    // Convert to numbers for arithmetic
+                    const depositAmountNum = depositAmount.toNumber();
+                    const lateFeeAmountNum = lateFeeAmount.toNumber();
+
+                    // Update member cash balance
+                    await prisma.cashBalanceMember.update({
+                        where: { memberId: deposit.memberId },
+                        data: {
+                            totalDeposit: {
+                                decrement: depositAmountNum,
+                            },
+                            availableCash: {
+                                decrement: depositAmountNum,
+                            },
+                            totalLateFee: {
+                                decrement: lateFeeAmountNum,
                             },
                             updatedAt: new Date(),
                         },

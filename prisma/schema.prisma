@@ -115,7 +115,9 @@ model depositInfo {
   year           Int
   month          Int
   day            Int
-  is_fine_waived Boolean    @default(false) // Indicates if fine was waived for this deposit
+  lateFeeAmount  Decimal?   @db.Decimal(10, 2) // Nullable, if no late fee
+  isLate         Boolean    @default(false) // Indicates if deposit was late
+  is_fine_waived Boolean    @default(false)
   member         memberInfo @relation("MemberDeposits", fields: [memberId], references: [memberId])
   memberId       String
   createdAt      DateTime   @default(now())

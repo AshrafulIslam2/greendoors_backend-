@@ -29,12 +29,31 @@ export class DepositController {
     }
 
 
-    @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
-    @Get('/:id')
-    depositById(@Request() req, @Query() paginationDto) {
+    // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @UseGuards(JwtAuthGuard)
+    @Get('/me')
+    userDeposits(@Request() req, @Query() paginationDto) {
         const user = req.user
         const { page, limit } = paginationDto;
-        return this.depositService.getDepositById(user.memberId, page, limit,);
+        return this.depositService.getDepositById(user.memberId, page, limit);
+    }
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPER_ADMIN) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @Get('/cashbalance')
+    async cashBalance() {
+        return this.depositService.getCashBalance();
+    }
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPER_ADMIN) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @Get('/cashbalance/:memberId')
+    async memberCashBalance(@Param('memberId') memberId: string) {
+        return this.depositService.memberCashBalance(memberId);
+    }
+    @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
+    @Get('/:id')
+    depositById(@Request() req, @Query() paginationDto, @Param('id') id: string) {
+        const { page, limit } = paginationDto;
+        return this.depositService.getDepositById(id, page, limit,);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -54,18 +73,7 @@ export class DepositController {
         console.log(user)
         return this.depositService.deleteDeposit(id);
     }
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.SUPER_ADMIN) // Use JwtAuthGuard instead of AuthGuard('jwt')
-    @Post('/cashbalance')
-    async cashBalance() {
-        return this.depositService.getCashBalance();
-    }
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.SUPER_ADMIN) // Use JwtAuthGuard instead of AuthGuard('jwt')
-    @Post('/cashbalance/:memberId')
-    async memberCashBalance(@Param('memberId') memberId: string) {
-        return this.depositService.memberCashBalance(memberId);
-    }
+
 
 
 
