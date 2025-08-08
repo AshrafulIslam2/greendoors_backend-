@@ -4,7 +4,7 @@ import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // Import JwtAuthGuard
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { $Enums } from '@prisma/client';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { multerConfig } from '../common/multer.config';
 
@@ -24,7 +24,7 @@ export class UserController {
     // }
 
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
-    @Roles(Role.SUPER_ADMIN)
+    @Roles($Enums.Role.SUPER_ADMIN)
     @Post('/create')
     create(@Request() req, @Body() dto: any) {
         return this.userService.createMember(req.user.memberId, dto);
@@ -112,14 +112,14 @@ export class UserController {
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
-    @Roles(Role.SUPER_ADMIN)
+    @Roles($Enums.Role.SUPER_ADMIN)
     @Get('member/:id')
     getUserById(@Param('id') id: string) {
         return this.userService.getUserById(id);
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
-    @Roles(Role.SUPER_ADMIN)
+    @Roles($Enums.Role.SUPER_ADMIN)
     @Delete('/:id')
     delete(@Request() req, @Param('id') id: number, @Body() deleteDto: { reason?: string },) {
         const adminId = req.user.id
@@ -128,7 +128,7 @@ export class UserController {
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard) // Use JwtAuthGuard instead of AuthGuard('jwt')
-    @Roles(Role.SUPER_ADMIN)
+    @Roles($Enums.Role.SUPER_ADMIN)
     @Get('/member-list')
     getMemberList() {
         return this.userService.getMemberList();
