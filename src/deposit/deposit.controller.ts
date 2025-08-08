@@ -1,12 +1,12 @@
 
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Request, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'; // Import JwtAuthGuard
-import { RolesGuard } from 'src/auth/roles.guard';
-import { Roles } from 'src/auth/roles.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // Import JwtAuthGuard
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
-import { multerConfig } from 'src/common/multer.config';
+import { multerConfig } from '../common/multer.config';
 import { DepositService } from './deposit.service';
 @Controller('deposit')
 export class DepositController {

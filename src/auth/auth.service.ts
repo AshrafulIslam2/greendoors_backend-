@@ -1,11 +1,11 @@
 /* eslint-disable prettier/prettier */
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from 'src/prisma/prisma.service'; // Import PrismaService
+import { PrismaService } from '../prisma/prisma.service'; // Import PrismaService
 import { compare, } from 'bcryptjs';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { EmailService } from 'src/email/email.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
