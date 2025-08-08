@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as sgMail from '@sendgrid/mail';
+import sgMail from '@sendgrid/mail';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
@@ -8,17 +8,17 @@ export class EmailService implements OnModuleInit {
   onModuleInit() {
     const apiKey = process.env.SENDGRID_API_KEY;
 
-    if (!apiKey) {
-      throw new Error('SENDGRID_API_KEY environment variable is not set');
-    }
+    // if (!apiKey) {
+    //   throw new Error('SENDGRID_API_KEY environment variable is not set');
+    // }
 
-    if (!process.env.FROM_EMAIL) {
-      throw new Error('FROM_EMAIL environment variable is not set');
-    }
+    // if (!process.env.FROM_EMAIL) {
+    //   throw new Error('FROM_EMAIL environment variable is not set');
+    // }
 
-    if (!process.env.FROM_NAME) {
-      throw new Error('FROM_NAME environment variable is not set');
-    }
+    // if (!process.env.FROM_NAME) {
+    //   throw new Error('FROM_NAME environment variable is not set');
+    // }
 
     sgMail.setApiKey(apiKey);
     this.logger.log('SendGrid email service initialized successfully');
