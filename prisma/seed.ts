@@ -6,7 +6,7 @@ import { hash } from 'bcryptjs'; // ✅
 const prisma = new PrismaClient()
 
 async function main() {
-    const existingCashBalance = await prisma.cashBalance.findFirst()
+    const existingCashBalance = await prisma.cashBalance.findFirst();
     let cashBalance
     if (!existingCashBalance) {
         cashBalance = await prisma.cashBalance.create({
@@ -24,8 +24,11 @@ async function main() {
         });
         console.log('✅ CashBalance record created.');
     } else {
+        cashBalance = existingCashBalance;
         console.log('ℹ️ CashBalance already exists.');
     }
+    console.log("🚀 ~ main ~ cashBalance:", cashBalance)
+
     const email = 'admin@example.com'
     const password = '12345'
     const hashedPassword = await hash(password, 10); // Use the imported hash function
@@ -52,6 +55,7 @@ async function main() {
         },
     })
     if (cashBalance?.id) {
+        console.log("🚀 ~ main ~ updating cashBalance:", cashBalance)
         await prisma.cashBalance.update({
             where: { id: cashBalance.id },
             data: {
@@ -63,9 +67,10 @@ async function main() {
                 },
             },
         });
+        console.log('✅ CashBalance updated with registration fee.');
     }
 
-    console.log('Super Admin created:', superAdmin)
+    // console.log('Super Admin created:', superAdmin)
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect())

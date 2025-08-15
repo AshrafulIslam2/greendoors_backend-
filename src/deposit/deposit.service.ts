@@ -25,232 +25,228 @@ export class DepositService {
         }
     }
     async addDeposit(dto: any) {
-        console.log("dto", dto);
-        if (!dto.amount || dto.amount <= 0) {
-            throw new BadRequestException("Deposit amount must be greater than zero");
+        if (!dto.amount || dto.amount <= 0 || isNaN(dto.amount)) {
+            throw new BadRequestException('Deposit amount must be a positive number');
         }
-
-
+        if (!dto.memberId || isNaN(dto.memberId)) {
+            throw new BadRequestException('Invalid member ID');
+        }
         const depositDate = new Date(dto.depositDate);
-        if (!depositDate || isNaN(new Date(depositDate).getTime())) {
-            throw new BadRequestException("Invalid deposit date");
+        if (isNaN(depositDate.getTime())) {
+            throw new BadRequestException('Invalid deposit date');
         }
+
         await this.checkIfDepositExistsForMonth(dto.memberId, depositDate);
+
         const day = depositDate.getDate();
         const month = depositDate.getMonth() + 1;
         const year = depositDate.getFullYear();
+        // const period = `${year}-${month.toString().padStart(2, '0')}`;
         const isLate = day > 15;
-        const isFineWaived = dto.is_fine_waived;
+        const isFineWaived = !!dto.is_fine_waived;
         const lateFeeAmount = isLate && !isFineWaived ? 100 : 0;
         const adjustedDepositAmount = dto.amount - lateFeeAmount;
+        console.log("🚀 ~ DepositService ~ addDeposit ~ adjustedDepositAmount:", adjustedDepositAmount)
 
         try {
-            const result = await this.prisma.$transaction(async (prisma) => {
+            return await this.prisma.$transaction(async (prisma) => {
                 const member = await prisma.memberInfo.findUnique({
-                    where: {
-                        memberId: dto.memberId,
-                    },
+                    where: { memberId: (dto.memberId) },
                 });
-
                 if (!member) {
-                    throw new BadRequestException("Member not found");
+                    throw new BadRequestException('Member not found');
                 }
 
                 const deposit = await prisma.depositInfo.create({
                     data: {
-                        amount: dto.amount,
+                        amount: adjustedDepositAmount,
                         notes: dto.notes || '',
-                        lateFeeAmount: isLate ? lateFeeAmount : 0, // Store late fee amount if applicable
+                        lateFeeAmount: lateFeeAmount,
                         depositDate,
                         year,
                         month,
                         day,
-                        is_fine_waived: dto.is_fine_waived || dto.is_fine_waved || false,
+                        is_fine_waived: isFineWaived,
+                        isLate,
                         createdAt: new Date(),
                         updatedAt: new Date(),
-                        member: {
-                            connect: { id: member.id },
-                        },
+                        member: { connect: { id: member.id } },
                     },
                 });
 
-                // Only create late fee record if there's actually a late fee (not waived and date > 15)
                 if (isLate && !isFineWaived) {
                     await prisma.lateFee.create({
                         data: {
                             amount: lateFeeAmount,
                             feeDate: depositDate,
-                            memberId: dto.memberId,
+                            memberId: (dto.memberId),
                             depositInfoId: deposit.id,
                         },
                     });
                 }
 
-                // Update global cash balance
                 const cashBalance = await prisma.cashBalance.findFirst();
-                if (cashBalance) {
-                    await prisma.cashBalance.update({
-                        where: { id: cashBalance.id },
-                        data: {
-                            totalLateFee: {
-                                increment: isFineWaived ? 0 : lateFeeAmount,
-                            },
-                            totalDeposit: {
-                                increment: dto.amount,
-                            },
-                            availableCash: {
-                                increment: dto.amount,
-                            },
-                            updatedAt: new Date(),
-                        },
-                    });
-                } else {
-                    await prisma.cashBalance.create({
-                        data: {
-                            totalDeposit: dto.registrationAmount,
-                            availableCash: dto.registrationAmount,
-                            updatedAt: new Date(),
-                        },
-                    });
-                }
+                const cashBalanceData = cashBalance || await prisma.cashBalance.create({
+                    data: {
+                        totalLateFee: 0,
+                        totalDeposit: 0,
+                        availableCash: 0,
+                        updatedAt: new Date(),
+                    },
+                });
 
-                // Update or create member cash balance
+                await prisma.cashBalance.update({
+                    where: { id: cashBalanceData.id },
+                    data: {
+                        totalLateFee: { increment: lateFeeAmount },
+                        totalDeposit: { increment: adjustedDepositAmount },
+                        availableCash: { increment: dto.amount },
+                        updatedAt: new Date(),
+                    },
+                });
+
                 const memberCashBalance = await prisma.cashBalanceMember.findUnique({
-                    where: { memberId: dto.memberId },
+                    where: { memberId: (dto.memberId) },
                 });
                 if (memberCashBalance) {
                     await prisma.cashBalanceMember.update({
-                        where: { memberId: dto.memberId },
+                        where: { memberId: (dto.memberId) },
                         data: {
                             totalDeposit: { increment: adjustedDepositAmount },
                             availableCash: { increment: adjustedDepositAmount },
-                            totalLateFee: { increment: isFineWaived ? 0 : lateFeeAmount },
+                            totalLateFee: { increment: lateFeeAmount },
                             updatedAt: new Date(),
                         },
                     });
                 } else {
                     await prisma.cashBalanceMember.create({
                         data: {
-                            memberId: dto.memberId,
+                            memberId: (dto.memberId),
                             totalDeposit: adjustedDepositAmount,
                             availableCash: adjustedDepositAmount,
-                            totalLateFee: isFineWaived ? 0 : lateFeeAmount,
+                            totalLateFee: lateFeeAmount,
                             updatedAt: new Date(),
                         },
                     });
                 }
 
-                return deposit; // ✅ Return the created deposit
+                return deposit;
             });
-
-            return result; // ✅ Return from the outer function
         } catch (error) {
-            throw new BadRequestException("Failed to create deposit: " + error.message);
+            throw new BadRequestException(`Failed to create deposit: ${error.message}`);
         }
     }
     async editDeposit(depositId: number, dto: any) {
+        if (isNaN(depositId) || depositId <= 0) {
+            throw new BadRequestException('Invalid deposit ID');
+        }
+        if (!dto.amount || dto.amount <= 0 || isNaN(dto.amount)) {
+            throw new BadRequestException('Deposit amount must be a positive number');
+        }
+        if (!dto.memberId || isNaN(dto.memberId)) {
+            throw new BadRequestException('Invalid member ID');
+        }
+        const depositDate = new Date(dto.depositDate);
+        if (isNaN(depositDate.getTime())) {
+            throw new BadRequestException('Invalid deposit date');
+        }
+
         const existingDeposit = await this.prisma.depositInfo.findUnique({
             where: { id: Number(depositId) },
             include: { lateFee: true },
         });
-
         if (!existingDeposit) {
-            throw new BadRequestException("Deposit record not found");
+            throw new BadRequestException('Deposit record not found');
         }
 
-        if (!dto.amount || dto.amount <= 0) {
-            throw new BadRequestException("Deposit amount must be greater than zero");
-        }
-
-        if (!dto.depositData || isNaN(new Date(dto.depositData).getTime())) {
-            throw new BadRequestException("Invalid deposit date");
-        }
-
-        const depositDate = new Date(dto.depositData);
         const day = depositDate.getDate();
         const month = depositDate.getMonth() + 1;
         const year = depositDate.getFullYear();
+
         const isLate = day > 15;
-        const lateFeeAmount = isLate && !dto.is_fine_waived ? 100 : 0;
+        const isFineWaived = !!dto.is_fine_waived;
+        const lateFeeAmount = isLate && !isFineWaived ? 100 : 0;
         const adjustedDepositAmount = dto.amount - lateFeeAmount;
+        console.log("🚀 ~ DepositService ~ addDeposit ~ adjustedDepositAmount:", adjustedDepositAmount)
+
+        // Check for period conflict (excluding current deposit)
+
 
         try {
-            const result = await this.prisma.$transaction(async (prisma) => {
-                // 1. Update depositInfo
+            return await this.prisma.$transaction(async (prisma) => {
+                const originalDepositAmount = Number(existingDeposit.amount);
+                const originalLateFee = Number(existingDeposit.lateFeeAmount || 0);
+                const originalPaymentAmount = originalDepositAmount + originalLateFee;
+
+                const depositDiff = adjustedDepositAmount - originalDepositAmount;
+                const lateFeeDiff = lateFeeAmount - originalLateFee;
+                const paymentDiff = dto.amount - originalPaymentAmount;
+
                 const updatedDeposit = await prisma.depositInfo.update({
                     where: { id: Number(depositId) },
                     data: {
                         amount: adjustedDepositAmount,
                         depositDate,
-                        lateFeeAmount: isLate ? lateFeeAmount : 0,
+                        lateFeeAmount: lateFeeAmount,
                         day,
                         month,
                         year,
+
+                        isLate,
+                        is_fine_waived: isFineWaived,
+                        updatedAt: new Date(),
                     },
                 });
 
-                // 2. Update or create lateFee
                 if (existingDeposit.lateFee) {
-                    if (isLate && !dto.is_fine_waived) {
-                        // Update existing late fee
+                    if (isLate && !isFineWaived) {
                         await prisma.lateFee.update({
                             where: { id: existingDeposit.lateFee.id },
                             data: {
                                 amount: lateFeeAmount,
                                 feeDate: depositDate,
-                                memberId: dto.memberId,
+                                memberId: (dto.memberId),
                             },
                         });
                     } else {
-                        // Delete existing late fee if fine is waived or not late
                         await prisma.lateFee.delete({
                             where: { id: existingDeposit.lateFee.id },
                         });
                     }
-                } else if (isLate && !dto.is_fine_waived) {
-                    // Create new late fee only if late and not waived
+                } else if (isLate && !isFineWaived) {
                     await prisma.lateFee.create({
                         data: {
                             amount: lateFeeAmount,
                             feeDate: depositDate,
-                            memberId: dto.memberId,
+                            memberId: (dto.memberId),
                             depositInfoId: Number(depositId),
                         },
                     });
                 }
 
-                // 3. Adjust cash balance
                 const cashBalance = await prisma.cashBalance.findFirst();
-
                 if (cashBalance) {
-                    // Get original values
-                    const originalDepositAmount = existingDeposit.amount as Prisma.Decimal;
-                    const originalLateFee = existingDeposit.lateFeeAmount
-                        ? (existingDeposit.lateFeeAmount as Prisma.Decimal)
-                        : new Prisma.Decimal(0);
-
-                    // Convert Prisma.Decimal to number for calculations
-                    const originalDepositAmountNum = originalDepositAmount.toNumber();
-                    const originalLateFeeNum = originalLateFee.toNumber();
-
-                    // Calculate differences
-
-                    const depositDiff = dto.amount - originalDepositAmountNum; // Change in deposit amount
-                    const lateFeeDiff = lateFeeAmount - originalLateFeeNum; // Change in late fee
-
-                    // Update cash balance
                     await prisma.cashBalance.update({
                         where: { id: cashBalance.id },
                         data: {
-                            totalDeposit: {
-                                increment: depositDiff,
-                            },
-                            totalLateFee: {
-                                increment: lateFeeDiff,
-                            },
-                            availableCash: {
-                                increment: depositDiff + lateFeeDiff, // Total change in cash
-                            },
+                            totalDeposit: { increment: depositDiff },
+                            totalLateFee: { increment: lateFeeDiff },
+                            availableCash: { increment: paymentDiff },
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+
+                const memberCashBalance = await prisma.cashBalanceMember.findUnique({
+                    where: { memberId: (dto.memberId) },
+                });
+                if (memberCashBalance) {
+                    await prisma.cashBalanceMember.update({
+                        where: { memberId: (dto.memberId) },
+                        data: {
+                            totalDeposit: { increment: depositDiff },
+                            totalLateFee: { increment: lateFeeDiff },
+                            availableCash: { increment: depositDiff },
                             updatedAt: new Date(),
                         },
                     });
@@ -258,10 +254,70 @@ export class DepositService {
 
                 return updatedDeposit;
             });
-
-            return result;
         } catch (error) {
-            throw new BadRequestException("Failed to update deposit: " + error.message);
+            throw new BadRequestException(`Failed to update deposit: ${error.message}`);
+        }
+    }
+    async deleteDeposit(depositId: number) {
+        if (isNaN(depositId) || depositId <= 0) {
+            throw new BadRequestException('Invalid deposit ID');
+        }
+
+        try {
+            return await this.prisma.$transaction(async (prisma) => {
+                const deposit = await prisma.depositInfo.findUnique({
+                    where: { id: Number(depositId) },
+                    include: { lateFee: true, member: true },
+                });
+                if (!deposit) {
+                    throw new BadRequestException('Deposit record not found');
+                }
+
+                const depositAmount = Number(deposit.amount);
+                const lateFeeAmount = Number(deposit.lateFeeAmount || 0);
+                const paymentAmount = depositAmount + lateFeeAmount;
+
+                if (deposit.lateFee) {
+                    await prisma.lateFee.delete({
+                        where: { id: deposit.lateFee.id },
+                    });
+                }
+
+                await prisma.depositInfo.delete({
+                    where: { id: Number(depositId) },
+                });
+
+                const cashBalance = await prisma.cashBalance.findFirst();
+                if (cashBalance) {
+                    await prisma.cashBalance.update({
+                        where: { id: cashBalance.id },
+                        data: {
+                            totalDeposit: { decrement: depositAmount },
+                            totalLateFee: { decrement: lateFeeAmount },
+                            availableCash: { decrement: paymentAmount },
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+
+                const memberCashBalance = await prisma.cashBalanceMember.findUnique({
+                    where: { memberId: deposit.member.memberId },
+                });
+                if (memberCashBalance) {
+                    await prisma.cashBalanceMember.update({
+                        where: { memberId: deposit.member.memberId },
+                        data: {
+                            totalDeposit: { decrement: depositAmount },
+                            availableCash: { decrement: depositAmount },
+                            totalLateFee: { decrement: lateFeeAmount },
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+                return deposit;
+            });
+        } catch (error) {
+            throw new BadRequestException(`Failed to delete deposit: ${error.message}`);
         }
     }
     async getDeposit(page = 1, limit = 10) {
@@ -364,106 +420,7 @@ export class DepositService {
             },
         };
     }
-    async deleteDeposit(depositId: number) {
-        console.log("🚀 ~ DepositService ~ deleteDeposit ~ depositId:", depositId)
-        try {
-            const result = await this.prisma.$transaction(async (prisma) => {
-                // 1. Fetch the deposit with its related late fee
-                const deposit = await prisma.depositInfo.findUnique({
-                    where: { id: Number(depositId) },
-                    include: { lateFee: true, member: true },
-                });
-                console.log("🚀 ~ DepositService ~ deleteDeposit ~ deposit:", deposit)
 
-                if (!deposit) {
-                    throw new BadRequestException('Deposit record not found');
-                }
-
-                // // 2. Delete the associated late fee (if it exists)
-                if (deposit.lateFee) {
-                    await prisma.lateFee.delete({
-                        where: { id: deposit.lateFee.id },
-                    });
-                }
-
-                // // 3. Delete the deposit
-                await prisma.depositInfo.delete({
-                    where: { id: Number(depositId) },
-                });
-
-                // // 4. Update cash balance
-                const cashBalance = await prisma.cashBalance.findFirst();
-
-                if (cashBalance) {
-                    // Get deposit and late fee amounts
-                    const depositAmount = deposit.amount as Prisma.Decimal;
-                    const lateFeeAmount = deposit.lateFee?.amount
-                        ? (deposit.lateFee.amount as Prisma.Decimal)
-                        : new Prisma.Decimal(0);
-
-                    // Convert to numbers for arithmetic
-                    const depositAmountNum = depositAmount.toNumber();
-                    const lateFeeAmountNum = lateFeeAmount.toNumber();
-
-                    // Update cash balance
-                    await prisma.cashBalance.update({
-                        where: { id: cashBalance.id },
-                        data: {
-                            totalDeposit: {
-                                decrement: depositAmountNum - lateFeeAmountNum, // Adjust for late fee
-                            },
-                            totalLateFee: {
-                                decrement: lateFeeAmountNum,
-                            },
-                            availableCash: {
-                                decrement: depositAmountNum - lateFeeAmountNum,
-                            },
-                            updatedAt: new Date(),
-                        },
-                    });
-                }
-                //<!-- 5. Update member cash balance -->
-                const memberCashBalance = await prisma.cashBalanceMember.findUnique({
-                    where: { memberId: deposit.member.memberId },
-                });
-
-                if (memberCashBalance) {
-                    // Get deposit and late fee amounts
-                    const depositAmount = deposit.amount as Prisma.Decimal;
-                    const lateFeeAmount = deposit.lateFee?.amount
-                        ? (deposit.lateFee.amount as Prisma.Decimal)
-                        : new Prisma.Decimal(0);
-
-                    // Convert to numbers for arithmetic
-                    const depositAmountNum = depositAmount.toNumber();
-                    const lateFeeAmountNum = lateFeeAmount.toNumber();
-
-                    // Update member cash balance
-                    await prisma.cashBalanceMember.update({
-                        where: { memberId: deposit.memberId },
-                        data: {
-                            totalDeposit: {
-                                decrement: depositAmountNum,
-                            },
-                            availableCash: {
-                                decrement: depositAmountNum,
-                            },
-                            totalLateFee: {
-                                decrement: lateFeeAmountNum,
-                            },
-                            updatedAt: new Date(),
-                        },
-                    });
-                }
-
-                return deposit;
-            });
-
-            return result;
-        } catch (error) {
-            throw new BadRequestException('Failed to delete deposit: ' + error.message);
-        }
-    }
     async getCashBalance() {
         try {
             const data = await this.prisma.cashBalance.findFirst();
